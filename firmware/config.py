@@ -30,12 +30,15 @@ WIFI_PASSWORD = _env.get("WIFI_PASSWORD", "YOUR_WIFI_PASSWORD")
 FIREBASE_URL = _env.get("FIREBASE_URL", "https://your-project-id-default-rtdb.firebaseio.com")
 FIREBASE_AUTH = _env.get("FIREBASE_AUTH", "")  # Để trống nếu Database ở chế độ test rules
 
-# 3. Cấu hình GitHub OTA
+# 3. Cấu hình GitHub OTA & Local OTA (Khi không dùng GitHub/Firebase)
 GITHUB_USER = _env.get("GITHUB_USER", "chuvitvang")
 GITHUB_REPO = _env.get("GITHUB_REPO", "Iot_smart_drying_rack")
 GITHUB_BRANCH = _env.get("GITHUB_BRANCH", "main")
 GITHUB_RAW_BASE = f"https://raw.githubusercontent.com/{GITHUB_USER}/{GITHUB_REPO}/{GITHUB_BRANCH}"
 OTA_VERSION_URL = f"{GITHUB_RAW_BASE}/version.json"
+
+# Cập nhật qua máy tính trong mạng LAN (ví dụ: http://192.168.1.100:8000/main.py)
+LOCAL_OTA_URL = _env.get("LOCAL_OTA_URL", "")
 
 # Phiên bản hiện hành của Firmware
 CURRENT_VERSION = "1.0.0"

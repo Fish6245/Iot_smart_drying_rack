@@ -126,12 +126,19 @@ def perform_ota(ota_data):
 
 def check_and_update_github(force=False):
     """
-    Kiểm tra và cập nhật OTA TRỰC TIẾP từ GitHub
-    Hoàn toàn KHÔNG cần Firebase URL và Auth!
-    - Đọc version.json từ GitHub
-    - So sánh với CURRENT_VERSION
-    - Tự tải và khởi động lại nếu có bản mới
+    Kiểm tra và cập nhật OTA TRỰC TIẾP (Không cần Firebase)
+    Hỗ trợ 2 nguồn tải:
+      1. Từ máy tính nội bộ trong mạng LAN (nếu có config.LOCAL_OTA_URL)
+      2. Từ GitHub Repository
     """
+    # Nếu người dùng cấu hình tải từ máy tính nội bộ qua mạng LAN:
+    if config.LOCAL_OTA_URL:
+        print(f"[OTA] Đang cập nhật từ máy tính nội bộ (LAN): {config.LOCAL_OTA_URL}")
+        return perform_ota({
+            "target_version": "local",
+            "download_url": config.LOCAL_OTA_URL
+        })
+
     print("[OTA] Kiểm tra phiên bản trực tiếp từ GitHub...")
     res = None
     try:
