@@ -93,6 +93,19 @@ Iot_smart_drying_rack/
 
 ## 🚀 4. Quy Trình Cập Nhật Firmware Từ Xa (GitHub OTA)
 
+Hệ thống hỗ trợ **2 cơ chế cập nhật OTA linh hoạt**:
+
+### Cách 1: Cập nhật trực tiếp từ GitHub (KHÔNG CẦN FIREBASE)
+Nếu bạn chưa có tài khoản Firebase hoặc không muốn dùng cơ sở dữ liệu:
+1. Đẩy code mới lên nhánh `main` trên GitHub và nâng số phiên bản trong `version.json`.
+2. **Kích hoạt nạp firmware mới trên mạch bằng 1 trong 2 cách:**
+   * **Cách A (Nhấn giữ nút SW1):** Nhấn và giữ nút cơ `SW1` (chân `D6 / GPIO 12`) trong **3 giây**. Mạch sẽ nhận diện thao tác nhấn giữ, tự kết nối GitHub Raw, tải tệp `main.py` mới nhất và tự reset máy.
+   * **Cách B (Tự động khi khởi động):** Mỗi lần cắm điện/reset, mạch sẽ tự động đọc `version.json` từ GitHub. Nếu phát hiện phiên bản trên GitHub lớn hơn phiên bản hiện tại, mạch sẽ tự nâng cấp.
+> 💡 *Lưu ý: Quá trình OTA chỉ cập nhật tệp logic chương trình (`main.py`), hoàn toàn giữ nguyên tệp `.env` và `config.py` nên bạn không bao giờ bị mất mật khẩu WiFi.*
+
+---
+
+### Cách 2: Cập nhật qua Web Dashboard (Khi có Firebase)
 1. Khi bạn sửa đổi logic trong `firmware/main.py`:
    - Nâng số phiên bản trong `version.json` (ví dụ `1.0.0` -> `1.0.1`).
    - Cập nhật ghi chú `changelog`.

@@ -20,6 +20,11 @@ let currentControlState = {
 };
 
 function initFirebase() {
+  if (!currentConfig.firebase.databaseURL || currentConfig.firebase.databaseURL.includes("your-project-id")) {
+    console.log("[*] Firebase URL chưa được cấu hình. Hoạt động ở chế độ độc lập.");
+    updateConnBadge(false, "Chưa kết nối Firebase (Bấm ⚙️ để nhập)");
+    return;
+  }
   try {
     const app = initializeApp(currentConfig.firebase);
     db = getDatabase(app);
@@ -264,7 +269,12 @@ async function checkGithubUpdate() {
 }
 
 function triggerOTA() {
-  if (!db || !latestGithubVersion) return;
+  if (!latestGithubVersion) return;
+
+  if (!db || currentConfig.firebase.databaseURL.includes("your-project-id")) {
+    alert("⚠️ Bạn chưa cấu hình Firebase Database URL trên WebApp!\n\n💡 Để cập nhật OTA mà KHÔNG cần Firebase:\nNhấn và giữ nút nhấn cơ SW1 (GPIO 12) trên mạch trong 3 giây.\nThiết bị sẽ tự động tải firmware mới nhất trực tiếp từ GitHub về nạp!");
+    return;
+  }
   const gh = currentConfig.github;
   const downloadUrl = `https://raw.githubusercontent.com/${gh.user}/${gh.repo}/${gh.branch}/firmware/main.py`;
 
