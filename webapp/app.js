@@ -201,11 +201,25 @@ function updateUIWithTelemetry(data, isSimulated = false) {
     sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
   }
 
-  // 4. Nhiệt ẩm DHT22
+  // 4. Nhiệt ẩm DHT22 & Xác thực độ ẩm
   const elTemp = document.getElementById('val-temp');
   const elHum = document.getElementById('val-hum');
+  const humVal = Number(data.humidity ?? 0);
   if (elTemp) elTemp.innerText = `${Number(data.temperature ?? 0).toFixed(1)} °C`;
-  if (elHum) elHum.innerText = `${Number(data.humidity ?? 0).toFixed(1)} %`;
+  if (elHum) elHum.innerText = `${humVal.toFixed(1)} %`;
+
+  const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
+  const isHumid = data.is_humid !== undefined ? !!data.is_humid : (humVal > humThresh);
+  const humBadge = document.getElementById('hum-status-badge');
+  if (humBadge) {
+    if (isHumid) {
+      humBadge.innerText = "💧 Quá ẩm (Ẩm ướt)";
+      humBadge.className = "tag tag-rain";
+    } else {
+      humBadge.innerText = "🌤️ Đạt chuẩn (Khô ráo)";
+      humBadge.className = "tag tag-safe";
+    }
+  }
 
   // 5. Trạng thái sào phơi
   if (data.clothesline_state) {
@@ -287,8 +301,10 @@ function setupFirebaseListeners() {
     if (!c) return;
     const rainThresh = document.getElementById('input-rain-thresh');
     const sunThresh = document.getElementById('input-sun-thresh');
-    if (rainThresh && c.rain_threshold) rainThresh.value = c.rain_threshold;
-    if (sunThresh && c.sun_threshold) sunThresh.value = c.sun_threshold;
+    const humThresh = document.getElementById('input-hum-thresh');
+    if (rainThresh && c.rain_threshold !== undefined) rainThresh.value = c.rain_threshold;
+    if (sunThresh && c.sun_threshold !== undefined) sunThresh.value = c.sun_threshold;
+    if (humThresh && c.humidity_threshold !== undefined) humThresh.value = c.humidity_threshold;
 
     // Lắng nghe lệnh điều khiển từ Firebase và cập nhật ngay lên GUI
     if (c.manual_command === "OPEN") {
@@ -438,6 +454,7 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
 
   const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
   const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
 
   const newDbUrl = document.getElementById('input-cfg-db-url')?.value.trim();
   const newApiKey = document.getElementById('input-cfg-api-key')?.value.trim();
@@ -468,7 +485,8 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
 
       await update(ref(db, 'smart_clothesline/control'), {
         rain_threshold: rainThresh,
-        sun_threshold: sunThresh
+        sun_threshold: sunThresh,
+        humidity_threshold: humThresh
       });
     } catch (err) {
       console.error("Lỗi lưu lên Firebase:", err);
@@ -504,6 +522,7 @@ const valLdr = document.getElementById('sim-val-ldr');
 const subLdr = document.getElementById('sim-sub-ldr');
 const valTemp = document.getElementById('sim-val-temp');
 const valHum = document.getElementById('sim-val-hum');
+const subHum = document.getElementById('sim-sub-hum');
 
 const modeBadge = document.getElementById('sim-mode-badge');
 const modeLocal = document.getElementById('sim-mode-local');
@@ -555,6 +574,7 @@ function updateSliderLabels() {
 
   const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
   const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
 
   if (valRain) valRain.innerText = rain;
   if (subRain) subRain.innerText = rain < rainThresh ? "(Đang mưa)" : "(Khô ráo)";
@@ -564,6 +584,7 @@ function updateSliderLabels() {
 
   if (valTemp) valTemp.innerText = `${temp.toFixed(1)} °C`;
   if (valHum) valHum.innerText = `${hum.toFixed(1)} %`;
+  if (subHum) subHum.innerText = hum > humThresh ? "(Quá ẩm)" : "(Khô ráo)";
 }
 
 [sliderRain, sliderLdr, sliderTemp, sliderHum].forEach(s => {
@@ -581,16 +602,18 @@ function applySimulatedData() {
 
   const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
   const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
   const rainPriority = document.getElementById('toggle-rain-priority')?.checked !== false;
 
   const isRaining = rain < rainThresh;
   const isSunny = ldr > sunThresh;
+  const isHumid = hum > humThresh;
 
-  // Xác định trạng thái sào theo quy tắc ưu tiên
+  // Xác định trạng thái sào theo quy tắc ưu tiên: Mưa hoặc Quá ẩm sẽ thu sào
   let clotheslineState = "OPEN";
-  if (rainPriority && isRaining) {
+  if (rainPriority && (isRaining || isHumid)) {
     clotheslineState = "CLOSED";
-  } else if (!isRaining && isSunny) {
+  } else if (!isRaining && isSunny && !isHumid) {
     clotheslineState = "OPEN";
   } else {
     clotheslineState = "CLOSED";
@@ -603,6 +626,7 @@ function applySimulatedData() {
     is_raining: isRaining,
     ldr_a1: ldr,
     is_sunny: isSunny,
+    is_humid: isHumid,
     clothesline_state: clotheslineState,
     sun_minutes_today: 185,
     last_updated: Math.floor(Date.now() / 1000)

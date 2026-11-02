@@ -521,6 +521,13 @@ body {
   margin: 12px 0;
 }
 
+.setting-row-thresh {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 12px 0;
+}
+
 .time-box label {
   display: block;
   font-weight: 600;

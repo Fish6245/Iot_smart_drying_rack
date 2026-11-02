@@ -102,6 +102,7 @@ system_state = {
     "servo_angle": config.SERVO_ANGLE_IN,
     "rain_threshold": config.DEFAULT_RAIN_THRESHOLD,
     "sun_threshold": config.DEFAULT_SUN_THRESHOLD,
+    "humidity_threshold": config.DEFAULT_HUMIDITY_THRESHOLD,
 
     # Schedule
     "auto_schedule_enabled": True,
@@ -125,7 +126,7 @@ def build_fb_url(path):
         url += f"?auth={config.FIREBASE_AUTH}"
     return url
 
-def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny):
+def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid):
     """Đẩy telemetry thời gian thực lên Firebase"""
     if not firebase_enabled:
         return
@@ -137,6 +138,7 @@ def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny):
         "is_raining": is_raining,
         "ldr_a1": ldr_a1,
         "is_sunny": is_sunny,
+        "is_humid": is_humid,
         "clothesline_state": system_state["clothesline_state"],
         "sun_minutes_today": system_state["sun_minutes_today"],
         "last_updated": time.time()
@@ -306,6 +308,7 @@ while True:
     # Phân tích điều kiện thời tiết thực tế
     is_raining = water_a0 < system_state["rain_threshold"]
     is_sunny = ldr_a1 > system_state["sun_threshold"]
+    is_humid = hum > system_state["humidity_threshold"]
 
     # --- C. ĐỒNG BỘ CẤU HÌNH & LỆNH TỪ FIREBASE ---
     if firebase_enabled:
@@ -318,6 +321,8 @@ while True:
                     system_state["rain_threshold"] = int(ctrl["rain_threshold"])
                 if "sun_threshold" in ctrl and ctrl["sun_threshold"] is not None:
                     system_state["sun_threshold"] = int(ctrl["sun_threshold"])
+                if "humidity_threshold" in ctrl and ctrl["humidity_threshold"] is not None:
+                    system_state["humidity_threshold"] = float(ctrl["humidity_threshold"])
 
                 cmd = ctrl.get("manual_command")
                 if cmd in ("OPEN", "CLOSE") and cmd != system_state["manual_command"]:
@@ -353,8 +358,8 @@ while True:
     # Mục tiêu dự kiến cho sào phơi: "OPEN" hoặc "CLOSED"
     target_state = system_state["clothesline_state"]
 
-    # Mức ưu tiên 1: Chế độ ưu tiên chống mưa (Rain Priority Override)
-    if system_state["rain_priority_override"] and is_raining:
+    # Mức ưu tiên 1: Chế độ ưu tiên chống mưa & chống ẩm ướt (Rain & High Humidity Override)
+    if system_state["rain_priority_override"] and (is_raining or is_humid):
         target_state = "CLOSED"
 
     # Mức ưu tiên 2: Điều khiển thủ công (Manual Command)
@@ -366,9 +371,9 @@ while True:
         op_time = system_state["open_time"]
         cl_time = system_state["close_time"]
 
-        # So sánh thời gian trong ngày
+        # So sánh thời gian trong ngày (phơi khi trong lịch, không mưa và độ ẩm đạt chuẩn)
         in_schedule = (op_time <= current_time_str < cl_time)
-        if in_schedule and not is_raining:
+        if in_schedule and not is_raining and not is_humid:
             target_state = "OPEN"
         else:
             target_state = "CLOSED"
@@ -401,7 +406,7 @@ while True:
         push_history_record(temp, hum, water_a0, ldr_a1, epoch_now)
 
     # --- G. ĐẨY DỮ LIỆU TELEMETRY LÊN FIREBASE ĐỊNH KỲ ---
-    push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny)
+    push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid)
 
     # Quản lý giải phóng RAM cho ESP8266
     gc.collect()

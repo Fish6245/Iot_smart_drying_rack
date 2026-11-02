@@ -55,8 +55,9 @@ ADC_CHANNEL_RAIN = 0  # A0: Cảm biến mưa (WATER_A0)
 ADC_CHANNEL_LDR  = 1  # A1: Cảm biến quang trở (LDR_A1)
 
 # 5. Ngưỡng mặc định điều khiển tự động
-DEFAULT_RAIN_THRESHOLD = 15000  # ADC < 15000: Có mưa (cần thu sào)
-DEFAULT_SUN_THRESHOLD  = 16000  # ADC > 16000: Có nắng
+DEFAULT_RAIN_THRESHOLD     = 15000  # ADC < 15000: Có mưa (cần thu sào)
+DEFAULT_SUN_THRESHOLD      = 16000  # ADC > 16000: Có nắng
+DEFAULT_HUMIDITY_THRESHOLD = 80.0   # Độ ẩm (%) > 80.0%: Quá ẩm (không đạt chuẩn phơi, thu sào)
 
 # Góc quay Servo SG90 (Độ)
 SERVO_ANGLE_OUT = 90  # Đưa sào phơi ra ngoài (OPEN)
