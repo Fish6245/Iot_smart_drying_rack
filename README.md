@@ -110,6 +110,17 @@ Iot_smart_drying_rack/
    - Hiệu chuẩn ngưỡng cảm biến mưa (`rain_threshold`) và ngưỡng nắng (`sun_threshold`).
    - Cấu hình thông số kết nối Firebase RTDB & GitHub Repository trực tiếp trên giao diện.
 
+4. **🛠️ Dev Simulator Bar (Công cụ mô phỏng & kiểm thử ngoại vi):**
+   - **Kịch bản nhanh (Quick Scenarios):** ☀️ Nắng to (Phơi đồ), 🌧️ Đổ mưa (Thu sào khẩn cấp), 🌥️ Râm mát / Tối, 🌙 Đêm khuya.
+   - **Thanh trượt điều khiển thủ công:** Cảm biến Nước A0 (ADS1115), Quang trở LDR A1, Nhiệt độ và Độ ẩm DHT22.
+   - **2 chế độ kiểm thử:**
+     - `Local Mock`: Cập nhật trực tiếp lên giao diện Dashboard & Biểu đồ mà không cần Firebase/mạng.
+     - `Firebase Sync`: Đẩy dữ liệu giả lập trực tiếp lên Firebase Realtime Database để kiểm thử toàn diện cả hệ thống từ xa.
+   - **Tự động sinh dữ liệu (Auto-drift):** Tự động phát sinh dao động cảm biến mỗi 3 giây để vẽ đường biểu đồ thời gian thực.
+   - **Nút ghi lịch sử (Push History Record):** Thêm 1 điểm dữ liệu tức thì vào biểu đồ Chart.js.
+
+   - Cấu hình thông số kết nối Firebase RTDB & GitHub Repository trực tiếp trên giao diện.
+
 ---
 
 ## ⚡ 5. Quy Tắc Ưu Tiên Xử Lý Trên Firmware (MicroPython)

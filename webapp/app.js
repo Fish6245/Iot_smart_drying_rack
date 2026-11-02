@@ -1,6 +1,7 @@
 // ==============================================================================
 // app.js - Logic Giao diện Bảng điều khiển Sào phơi thông minh (V2.0)
 // Tích hợp: Firebase RTDB Modular v10, Chart.js, Open-Meteo Weather API, GitHub OTA
+// & Dev Simulator Bar (Kiểm thử cảm biến & kịch bản thời tiết)
 // ==============================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -26,11 +27,11 @@ function getGithubVersionUrl() {
 function initFirebase() {
   const fbCfg = currentConfig.firebase;
   if (!fbCfg || !fbCfg.databaseURL || fbCfg.databaseURL.includes("your-project-id")) {
-    console.warn("[*] Firebase URL chưa được cấu hình. Hoạt động ở chế độ chờ cấu hình.");
+    console.warn("[*] Firebase URL chưa được cấu hình. Hoạt động ở chế độ thử nghiệm cục bộ.");
     const statusBadge = document.getElementById('device-status');
     if (statusBadge) {
-      statusBadge.innerText = "Chưa kết nối Firebase (Tab 3: Cài đặt)";
-      statusBadge.className = "badge offline";
+      statusBadge.innerText = "Chế độ Thử nghiệm (Local Mock)";
+      statusBadge.className = "badge";
     }
     return;
   }
@@ -60,6 +61,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     const targetSection = document.getElementById(btn.dataset.target);
     if (targetSection) {
       targetSection.classList.add('active');
+      // Khi mở tab Biểu đồ, kích hoạt resize để vẽ chính xác theo khung
+      if (btn.dataset.target === 'tab-charts') {
+        setTimeout(() => {
+          if (dhtChart) dhtChart.resize();
+          if (adcChart) adcChart.resize();
+        }, 50);
+      }
     }
   });
 });
@@ -146,6 +154,79 @@ document.getElementById('chart-limit')?.addEventListener('change', (e) => {
   loadHistoryCharts(parseInt(e.target.value));
 });
 
+// ==================== CẬP NHẬT GIAO DIỆN TỪ TELEMETRY ====================
+function updateUIWithTelemetry(data, isSimulated = false) {
+  if (!data) return;
+
+  // 1. Trạng thái kết nối
+  const statusBadge = document.getElementById('device-status');
+  if (statusBadge) {
+    if (isSimulated) {
+      statusBadge.innerText = "Giả lập (Simulated)";
+      statusBadge.className = "badge online";
+    } else {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const lastUp = data.last_updated || 0;
+      const isOnline = (nowSec - lastUp) < 30;
+      statusBadge.innerText = isOnline ? "Trực tuyến (Online)" : "Mất kết nối (Offline)";
+      statusBadge.className = `badge ${isOnline ? 'online' : 'offline'}`;
+    }
+  }
+
+  // 2. Cảm biến nước A0
+  const waterA0 = data.water_a0 ?? 0;
+  const wetPercent = Math.min(100, Math.max(0, Math.round((1 - waterA0 / 26400) * 100)));
+  const elWaterVal = document.getElementById('val-water-a0');
+  const elWaterSub = document.getElementById('sub-water-a0');
+  if (elWaterVal) elWaterVal.innerText = waterA0;
+  if (elWaterSub) elWaterSub.innerText = `ADC 16-bit (Độ ướt: ${wetPercent}%)`;
+
+  const rainBadge = document.getElementById('rain-status-badge');
+  if (rainBadge) {
+    rainBadge.innerText = data.is_raining ? "🌧️ Có mưa" : "☁️ Không mưa";
+    rainBadge.className = `tag ${data.is_raining ? 'tag-rain' : 'tag-safe'}`;
+  }
+
+  // 3. Quang trở LDR A1
+  const ldrA1 = data.ldr_a1 ?? 0;
+  const lightPercent = Math.min(100, Math.max(0, Math.round((ldrA1 / 26400) * 100)));
+  const elLdrVal = document.getElementById('val-ldr-a1');
+  const elLdrSub = document.getElementById('sub-ldr-a1');
+  if (elLdrVal) elLdrVal.innerText = ldrA1;
+  if (elLdrSub) elLdrSub.innerText = `ADC 16-bit (Cường độ: ${lightPercent}%)`;
+
+  const sunBadge = document.getElementById('sun-status-badge');
+  if (sunBadge) {
+    sunBadge.innerText = data.is_sunny ? "☀️ Có nắng" : "🌥️ Không nắng";
+    sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
+  }
+
+  // 4. Nhiệt ẩm DHT22
+  const elTemp = document.getElementById('val-temp');
+  const elHum = document.getElementById('val-hum');
+  if (elTemp) elTemp.innerText = `${Number(data.temperature ?? 0).toFixed(1)} °C`;
+  if (elHum) elHum.innerText = `${Number(data.humidity ?? 0).toFixed(1)} %`;
+
+  // 5. Trạng thái sào phơi
+  const poleState = document.getElementById('clothesline-state-text');
+  if (poleState) {
+    if (data.clothesline_state === "OPEN") {
+      poleState.innerText = "ĐANG MỞ";
+      poleState.style.color = "#16a34a";
+    } else {
+      poleState.innerText = "ĐANG THU";
+      poleState.style.color = "#d97706";
+    }
+  }
+
+  // 6. Thống kê thời gian phơi trong ngày
+  const totalMinutes = data.sun_minutes_today ?? 0;
+  const statDrying = document.getElementById('stat-drying-time');
+  if (statDrying) {
+    statDrying.innerText = `${Math.floor(totalMinutes / 60)} giờ ${totalMinutes % 60} phút`;
+  }
+}
+
 // ==================== LẮNG NGHE DỮ LIỆU FIREBASE ====================
 function setupFirebaseListeners() {
   if (!db) return;
@@ -155,69 +236,7 @@ function setupFirebaseListeners() {
   onValue(telemetryRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
-
-    // Trạng thái kết nối thiết bị
-    const nowSec = Math.floor(Date.now() / 1000);
-    const lastUp = data.last_updated || 0;
-    const isOnline = (nowSec - lastUp) < 30;
-    const statusBadge = document.getElementById('device-status');
-    if (statusBadge) {
-      statusBadge.innerText = isOnline ? "Trực tuyến (Online)" : "Mất kết nối (Offline)";
-      statusBadge.className = `badge ${isOnline ? 'online' : 'offline'}`;
-    }
-
-    // Cảm biến nước A0 & Trạng thái mưa
-    const waterA0 = data.water_a0 ?? 0;
-    const wetPercent = Math.min(100, Math.max(0, Math.round((1 - waterA0 / 26400) * 100)));
-    const elWaterVal = document.getElementById('val-water-a0');
-    const elWaterSub = document.getElementById('sub-water-a0');
-    if (elWaterVal) elWaterVal.innerText = waterA0;
-    if (elWaterSub) elWaterSub.innerText = `ADC 16-bit (Độ ướt: ${wetPercent}%)`;
-
-    const rainBadge = document.getElementById('rain-status-badge');
-    if (rainBadge) {
-      rainBadge.innerText = data.is_raining ? "🌧️ Có mưa" : "☁️ Không mưa";
-      rainBadge.className = `tag ${data.is_raining ? 'tag-rain' : 'tag-safe'}`;
-    }
-
-    // Quang trở LDR A1 & Xác thực nắng
-    const ldrA1 = data.ldr_a1 ?? 0;
-    const lightPercent = Math.min(100, Math.max(0, Math.round((ldrA1 / 26400) * 100)));
-    const elLdrVal = document.getElementById('val-ldr-a1');
-    const elLdrSub = document.getElementById('sub-ldr-a1');
-    if (elLdrVal) elLdrVal.innerText = ldrA1;
-    if (elLdrSub) elLdrSub.innerText = `ADC 16-bit (Cường độ: ${lightPercent}%)`;
-
-    const sunBadge = document.getElementById('sun-status-badge');
-    if (sunBadge) {
-      sunBadge.innerText = data.is_sunny ? "☀️ Có nắng" : "🌥️ Không nắng";
-      sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
-    }
-
-    // Cảm biến DHT22
-    const elTemp = document.getElementById('val-temp');
-    const elHum = document.getElementById('val-hum');
-    if (elTemp) elTemp.innerText = `${(data.temperature ?? 0).toFixed(1)} °C`;
-    if (elHum) elHum.innerText = `${(data.humidity ?? 0).toFixed(1)} %`;
-
-    // Trạng thái sào phơi
-    const poleState = document.getElementById('clothesline-state-text');
-    if (poleState) {
-      if (data.clothesline_state === "OPEN") {
-        poleState.innerText = "ĐANG MỞ";
-        poleState.style.color = "#16a34a";
-      } else {
-        poleState.innerText = "ĐANG THU";
-        poleState.style.color = "#d97706";
-      }
-    }
-
-    // Thống kê tổng thời gian phơi đồ trong ngày
-    const totalMinutes = data.sun_minutes_today ?? 0;
-    const statDrying = document.getElementById('stat-drying-time');
-    if (statDrying) {
-      statDrying.innerText = `${Math.floor(totalMinutes / 60)} giờ ${totalMinutes % 60} phút`;
-    }
+    updateUIWithTelemetry(data, false);
   });
 
   // 2. Giám sát Cơ chế Bảo trì (Maintenance)
@@ -261,13 +280,29 @@ function setupFirebaseListeners() {
 
 // ==================== ĐIỀU KHIỂN THỦ CÔNG ====================
 document.getElementById('btn-open-pole')?.addEventListener('click', () => {
-  if (!db) { alert("Vui lòng cấu hình Firebase tại Tab 3 trước khi điều khiển!"); return; }
-  update(ref(db, 'smart_clothesline/control'), { manual_command: "OPEN", servo_angle: 90 });
+  if (db) {
+    update(ref(db, 'smart_clothesline/control'), { manual_command: "OPEN", servo_angle: 90 });
+  } else {
+    // Cập nhật giả lập cục bộ khi không kết nối Firebase
+    const poleState = document.getElementById('clothesline-state-text');
+    if (poleState) {
+      poleState.innerText = "ĐANG MỞ";
+      poleState.style.color = "#16a34a";
+    }
+  }
 });
 
 document.getElementById('btn-close-pole')?.addEventListener('click', () => {
-  if (!db) { alert("Vui lòng cấu hình Firebase tại Tab 3 trước khi điều khiển!"); return; }
-  update(ref(db, 'smart_clothesline/control'), { manual_command: "CLOSE", servo_angle: 0 });
+  if (db) {
+    update(ref(db, 'smart_clothesline/control'), { manual_command: "CLOSE", servo_angle: 0 });
+  } else {
+    // Cập nhật giả lập cục bộ khi không kết nối Firebase
+    const poleState = document.getElementById('clothesline-state-text');
+    if (poleState) {
+      poleState.innerText = "ĐANG THU";
+      poleState.style.color = "#d97706";
+    }
+  }
 });
 
 // ==================== TÍCH HỢP OPEN-METEO WEATHER API ====================
@@ -295,11 +330,9 @@ async function fetchWeatherAPI() {
   }
 }
 fetchWeatherAPI();
-setInterval(fetchWeatherAPI, 300000); // 5 phút cập nhật 1 lần
+setInterval(fetchWeatherAPI, 300000);
 
 // ==================== CƠ CHẾ BẢO TRÌ (OTA & RESET) ====================
-let remoteGitData = null;
-
 document.getElementById('btn-check-ota')?.addEventListener('click', async () => {
   const gitVerEl = document.getElementById('git-fw-ver');
   const btnOta = document.getElementById('btn-update-ota');
@@ -309,7 +342,7 @@ document.getElementById('btn-check-ota')?.addEventListener('click', async () => 
     const versionUrl = getGithubVersionUrl();
     const res = await fetch(`${versionUrl}?t=${Date.now()}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    remoteGitData = await res.json();
+    const remoteGitData = await res.json();
 
     if (gitVerEl) gitVerEl.innerText = `v${remoteGitData.version}`;
     const curr = document.getElementById('curr-fw-ver')?.innerText.replace('v', '') || "2.0.0";
@@ -373,7 +406,6 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
   const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
   const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
 
-  // Đọc cấu hình kết nối Firebase & GitHub
   const newDbUrl = document.getElementById('input-cfg-db-url')?.value.trim();
   const newApiKey = document.getElementById('input-cfg-api-key')?.value.trim();
   const newProjectId = document.getElementById('input-cfg-project-id')?.value.trim();
@@ -392,7 +424,6 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
 
   saveUserConfig(currentConfig);
 
-  // Nếu Firebase đã kết nối, cập nhật schedule & control lên Firebase
   if (db) {
     try {
       await update(ref(db, 'smart_clothesline/schedule'), {
@@ -419,6 +450,255 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
     setTimeout(() => { toast.innerText = ""; }, 3000);
   }
 });
+
+// ==============================================================================
+// 🛠️ DEV SIMULATOR BAR - LOGIC KIỂM THỬ MÔ PHỎNG NGOẠI VI
+// ==============================================================================
+const simBar = document.getElementById('dev-sim-bar');
+const simCollapseBtn = document.getElementById('btn-toggle-sim-collapse');
+const simCollapseIcon = document.getElementById('sim-collapse-icon');
+const simCollapseText = document.getElementById('sim-collapse-text');
+const simHeaderToggle = document.getElementById('sim-header-toggle');
+
+const sliderRain = document.getElementById('sim-slider-rain');
+const sliderLdr = document.getElementById('sim-slider-ldr');
+const sliderTemp = document.getElementById('sim-slider-temp');
+const sliderHum = document.getElementById('sim-slider-hum');
+
+const valRain = document.getElementById('sim-val-rain');
+const subRain = document.getElementById('sim-sub-rain');
+const valLdr = document.getElementById('sim-val-ldr');
+const subLdr = document.getElementById('sim-sub-ldr');
+const valTemp = document.getElementById('sim-val-temp');
+const valHum = document.getElementById('sim-val-hum');
+
+const modeBadge = document.getElementById('sim-mode-badge');
+const modeLocal = document.getElementById('sim-mode-local');
+const modeFirebase = document.getElementById('sim-mode-firebase');
+
+let autoDriftInterval = null;
+
+// 1. Thu gọn / Mở rộng Dev Simulator
+function toggleSimBar(forceExpand = null) {
+  if (!simBar) return;
+  const isCollapsed = forceExpand !== null ? !forceExpand : simBar.classList.contains('collapsed');
+  if (isCollapsed) {
+    simBar.classList.remove('collapsed');
+    if (simCollapseIcon) simCollapseIcon.innerText = "▼";
+    if (simCollapseText) simCollapseText.innerText = "Thu gọn";
+  } else {
+    simBar.classList.add('collapsed');
+    if (simCollapseIcon) simCollapseIcon.innerText = "▲";
+    if (simCollapseText) simCollapseText.innerText = "Mở Simulator";
+  }
+}
+
+simCollapseBtn?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleSimBar();
+});
+
+simHeaderToggle?.addEventListener('click', () => {
+  toggleSimBar();
+});
+
+// 2. Chế độ đồng bộ (Local vs Firebase)
+function updateSimMode() {
+  const isSync = modeFirebase?.checked && !!db;
+  if (modeBadge) {
+    modeBadge.innerText = isSync ? "FIREBASE SYNC" : "LOCAL MOCK";
+    modeBadge.className = `badge badge-sim ${isSync ? 'sync' : ''}`;
+  }
+}
+modeLocal?.addEventListener('change', updateSimMode);
+modeFirebase?.addEventListener('change', updateSimMode);
+
+// 3. Cập nhật nhãn khi kéo Slider
+function updateSliderLabels() {
+  const rain = parseInt(sliderRain?.value || "25000");
+  const ldr = parseInt(sliderLdr?.value || "22000");
+  const temp = parseFloat(sliderTemp?.value || "32.5");
+  const hum = parseFloat(sliderHum?.value || "60.0");
+
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+
+  if (valRain) valRain.innerText = rain;
+  if (subRain) subRain.innerText = rain < rainThresh ? "(Đang mưa)" : "(Khô ráo)";
+
+  if (valLdr) valLdr.innerText = ldr;
+  if (subLdr) subLdr.innerText = ldr > sunThresh ? "(Nắng)" : "(Râm / Tối)";
+
+  if (valTemp) valTemp.innerText = `${temp.toFixed(1)} °C`;
+  if (valHum) valHum.innerText = `${hum.toFixed(1)} %`;
+}
+
+[sliderRain, sliderLdr, sliderTemp, sliderHum].forEach(s => {
+  s?.addEventListener('input', () => {
+    updateSliderLabels();
+  });
+});
+
+// 4. Áp dụng dữ liệu giả lập (Push / Apply)
+function applySimulatedData() {
+  const rain = parseInt(sliderRain?.value || "25000");
+  const ldr = parseInt(sliderLdr?.value || "22000");
+  const temp = parseFloat(sliderTemp?.value || "32.5");
+  const hum = parseFloat(sliderHum?.value || "60.0");
+
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const rainPriority = document.getElementById('toggle-rain-priority')?.checked !== false;
+
+  const isRaining = rain < rainThresh;
+  const isSunny = ldr > sunThresh;
+
+  // Xác định trạng thái sào theo quy tắc ưu tiên
+  let clotheslineState = "OPEN";
+  if (rainPriority && isRaining) {
+    clotheslineState = "CLOSED";
+  } else if (!isRaining && isSunny) {
+    clotheslineState = "OPEN";
+  } else {
+    clotheslineState = "CLOSED";
+  }
+
+  const simulatedPayload = {
+    temperature: temp,
+    humidity: hum,
+    water_a0: rain,
+    is_raining: isRaining,
+    ldr_a1: ldr,
+    is_sunny: isSunny,
+    clothesline_state: clotheslineState,
+    sun_minutes_today: 185,
+    last_updated: Math.floor(Date.now() / 1000)
+  };
+
+  // Nếu chọn ghi vào Firebase và có kết nối
+  if (modeFirebase?.checked && db) {
+    update(ref(db, 'smart_clothesline/telemetry'), simulatedPayload)
+      .then(() => console.log("[Sim] Đã đẩy telemetry giả lập lên Firebase"))
+      .catch(err => console.error("[Sim] Lỗi đẩy Firebase:", err));
+  } else {
+    // Cập nhật giao diện cục bộ (Local Mock)
+    updateUIWithTelemetry(simulatedPayload, true);
+  }
+}
+
+document.getElementById('btn-sim-apply')?.addEventListener('click', applySimulatedData);
+
+// 5. Kịch bản nhanh (Quick Scenarios)
+const scenarios = {
+  sunny: { rain: 25200, ldr: 23500, temp: 34.0, hum: 52.0 },
+  rainy: { rain: 6000, ldr: 7000, temp: 25.5, hum: 92.0 },
+  cloudy: { rain: 25500, ldr: 12000, temp: 28.5, hum: 70.0 },
+  night: { rain: 26000, ldr: 2200, temp: 23.5, hum: 84.0 }
+};
+
+document.querySelectorAll('.sim-scenario-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const sc = scenarios[btn.dataset.scenario];
+    if (!sc) return;
+
+    if (sliderRain) sliderRain.value = sc.rain;
+    if (sliderLdr) sliderLdr.value = sc.ldr;
+    if (sliderTemp) sliderTemp.value = sc.temp;
+    if (sliderHum) sliderHum.value = sc.hum;
+
+    updateSliderLabels();
+    applySimulatedData();
+  });
+});
+
+// 6. Ghi 1 mốc dữ liệu vào Biểu đồ Lịch sử
+document.getElementById('btn-sim-push-hist')?.addEventListener('click', () => {
+  const rain = parseInt(sliderRain?.value || "25000");
+  const ldr = parseInt(sliderLdr?.value || "22000");
+  const temp = parseFloat(sliderTemp?.value || "32.5");
+  const hum = parseFloat(sliderHum?.value || "60.0");
+  const nowTs = Math.floor(Date.now() / 1000);
+
+  if (modeFirebase?.checked && db) {
+    update(ref(db, `smart_clothesline/history/${nowTs}`), {
+      temp: temp,
+      hum: hum,
+      water_a0: rain,
+      ldr_a1: ldr
+    }).then(() => {
+      alert("✓ Đã ghi 1 mốc lịch sử lên Firebase!");
+    });
+  } else {
+    // Cập nhật biểu đồ Chart.js cục bộ
+    if (dhtChart && adcChart) {
+      const timeLabel = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      dhtChart.data.labels.push(timeLabel);
+      dhtChart.data.datasets[0].data.push(temp);
+      dhtChart.data.datasets[1].data.push(hum);
+      if (dhtChart.data.labels.length > 36) {
+        dhtChart.data.labels.shift();
+        dhtChart.data.datasets[0].data.shift();
+        dhtChart.data.datasets[1].data.shift();
+      }
+      dhtChart.update();
+
+      adcChart.data.labels.push(timeLabel);
+      adcChart.data.datasets[0].data.push(rain);
+      adcChart.data.datasets[1].data.push(ldr);
+      if (adcChart.data.labels.length > 36) {
+        adcChart.data.labels.shift();
+        adcChart.data.datasets[0].data.shift();
+        adcChart.data.datasets[1].data.shift();
+      }
+      adcChart.update();
+
+      alert("✓ Đã cập nhật 1 mốc dữ liệu vào biểu đồ cục bộ!");
+    }
+  }
+});
+
+// 7. Đặt lại mặc định
+document.getElementById('btn-sim-reset')?.addEventListener('click', () => {
+  if (sliderRain) sliderRain.value = 25000;
+  if (sliderLdr) sliderLdr.value = 22000;
+  if (sliderTemp) sliderTemp.value = 32.5;
+  if (sliderHum) sliderHum.value = 60.0;
+  updateSliderLabels();
+  applySimulatedData();
+});
+
+// 8. Tự động phát sinh dữ liệu (Auto-drift mỗi 3 giây)
+document.getElementById('sim-toggle-auto')?.addEventListener('change', (e) => {
+  if (e.target.checked) {
+    autoDriftInterval = setInterval(() => {
+      if (!sliderTemp || !sliderHum || !sliderLdr) return;
+      let curTemp = parseFloat(sliderTemp.value);
+      let curHum = parseFloat(sliderHum.value);
+      let curLdr = parseInt(sliderLdr.value);
+
+      // Thêm biến động ngẫu nhiên nhỏ
+      curTemp = Math.min(42, Math.max(18, curTemp + (Math.random() - 0.5) * 0.4));
+      curHum = Math.min(95, Math.max(30, curHum + (Math.random() - 0.5) * 0.8));
+      curLdr = Math.min(26400, Math.max(1000, curLdr + Math.round((Math.random() - 0.5) * 400)));
+
+      sliderTemp.value = curTemp.toFixed(1);
+      sliderHum.value = curHum.toFixed(1);
+      sliderLdr.value = curLdr;
+
+      updateSliderLabels();
+      applySimulatedData();
+    }, 3000);
+  } else {
+    if (autoDriftInterval) {
+      clearInterval(autoDriftInterval);
+      autoDriftInterval = null;
+    }
+  }
+});
+
+// Khởi tạo nhãn cho simulator
+updateSliderLabels();
+updateSimMode();
 
 // Khởi chạy Firebase khi trang load
 initFirebase();

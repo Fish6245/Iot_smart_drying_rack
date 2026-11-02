@@ -128,11 +128,15 @@
       <div class="grid-2">
         <div class="card chart-container">
           <h3>Biểu đồ Nhiệt độ (°C) & Độ ẩm (%) - DHT22</h3>
-          <canvas id="dhtChart"></canvas>
+          <div class="chart-wrapper">
+            <canvas id="dhtChart"></canvas>
+          </div>
         </div>
         <div class="card chart-container">
           <h3>Biểu đồ Cảm biến Nước A0 & Quang trở LDR A1 (ADC)</h3>
-          <canvas id="adcChart"></canvas>
+          <div class="chart-wrapper">
+            <canvas id="adcChart"></canvas>
+          </div>
         </div>
       </div>
     </section>
@@ -226,6 +230,112 @@
       </div>
     </section>
   </main>
+
+  <!-- ==================== DEV SIMULATOR BAR ==================== -->
+  <aside id="dev-sim-bar" class="dev-sim-bar collapsed">
+    <!-- Header / Toggle Strip -->
+    <div class="sim-header" id="sim-header-toggle">
+      <div class="sim-title">
+        <span class="sim-icon">🛠️</span>
+        <strong>Dev Simulator Bar</strong>
+        <span class="badge badge-sim" id="sim-mode-badge">LOCAL MOCK</span>
+        <span class="sim-subtext">Kiểm thử cảm biến & kịch bản thời tiết</span>
+      </div>
+      <div class="sim-header-actions">
+        <button id="btn-toggle-sim-collapse" class="btn btn-sm btn-outline-light">
+          <span id="sim-collapse-icon">▲</span> <span id="sim-collapse-text">Mở Simulator</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Simulator Body (Collapsible) -->
+    <div class="sim-body" id="sim-body">
+      <!-- Row 1: Scenarios & Mode -->
+      <div class="sim-row">
+        <div class="sim-col">
+          <label class="sim-label">🎯 Kịch bản nhanh (Quick Scenarios):</label>
+          <div class="sim-btn-group">
+            <button class="btn btn-sm sim-scenario-btn" data-scenario="sunny">☀️ Nắng to (Phơi đồ)</button>
+            <button class="btn btn-sm sim-scenario-btn" data-scenario="rainy">🌧️ Đổ mưa (Thu sào)</button>
+            <button class="btn btn-sm sim-scenario-btn" data-scenario="cloudy">🌥️ Râm mát / Tối</button>
+            <button class="btn btn-sm sim-scenario-btn" data-scenario="night">🌙 Đêm khuya</button>
+          </div>
+        </div>
+
+        <div class="sim-col sim-col-mode">
+          <label class="sim-label">Chế độ kiểm thử:</label>
+          <div class="sim-mode-toggle">
+            <label class="radio-label">
+              <input type="radio" name="sim-target" value="local" checked id="sim-mode-local">
+              <span>Chỉ trên Web (Local)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="sim-target" value="firebase" id="sim-mode-firebase">
+              <span>Ghi vào Firebase (Sync)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2: Sliders & Controls -->
+      <div class="sim-grid-sliders">
+        <!-- Rain Sensor A0 -->
+        <div class="sim-slider-box">
+          <div class="sim-slider-header">
+            <span>🌧️ Nước A0 (ADS1115):</span>
+            <strong id="sim-val-rain">25000</strong>
+            <small id="sim-sub-rain">(Khô ráo)</small>
+          </div>
+          <input type="range" id="sim-slider-rain" min="2000" max="26400" step="200" value="25000">
+        </div>
+
+        <!-- LDR A1 -->
+        <div class="sim-slider-box">
+          <div class="sim-slider-header">
+            <span>☀️ Quang trở LDR A1:</span>
+            <strong id="sim-val-ldr">22000</strong>
+            <small id="sim-sub-ldr">(Nắng)</small>
+          </div>
+          <input type="range" id="sim-slider-ldr" min="1000" max="26400" step="200" value="22000">
+        </div>
+
+        <!-- Temperature -->
+        <div class="sim-slider-box">
+          <div class="sim-slider-header">
+            <span>🌡️ Nhiệt độ DHT22:</span>
+            <strong id="sim-val-temp">32.5 °C</strong>
+          </div>
+          <input type="range" id="sim-slider-temp" min="15.0" max="45.0" step="0.5" value="32.5">
+        </div>
+
+        <!-- Humidity -->
+        <div class="sim-slider-box">
+          <div class="sim-slider-header">
+            <span>💧 Độ ẩm DHT22:</span>
+            <strong id="sim-val-hum">60.0 %</strong>
+          </div>
+          <input type="range" id="sim-slider-hum" min="20.0" max="100.0" step="1.0" value="60.0">
+        </div>
+      </div>
+
+      <!-- Row 3: Action Buttons & Auto Generator -->
+      <div class="sim-row sim-footer-row">
+        <div class="sim-auto-drift">
+          <label class="switch switch-sm">
+            <input type="checkbox" id="sim-toggle-auto">
+            <span class="slider"></span>
+          </label>
+          <span>Tự động phát sinh dữ liệu (Auto-drift mỗi 3s)</span>
+        </div>
+
+        <div class="sim-actions">
+          <button id="btn-sim-apply" class="btn btn-sm btn-primary">⚡ Áp dụng dữ liệu</button>
+          <button id="btn-sim-push-hist" class="btn btn-sm btn-outline-light">📈 Ghi 1 mốc Lịch sử (Chart)</button>
+          <button id="btn-sim-reset" class="btn btn-sm btn-secondary">🔄 Mặc định</button>
+        </div>
+      </div>
+    </div>
+  </aside>
 
   <script type="module" src="app.js"></script>
 </body>
