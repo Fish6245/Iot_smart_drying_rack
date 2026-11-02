@@ -1,13 +1,12 @@
 // ==============================================================================
-// config.js - Cấu hình Firebase & GitHub cho WebApp
-// Người dùng có thể thay đổi trực tiếp tại đây hoặc qua giao diện cài đặt trên Web
+// config.js - Cấu hình Firebase & GitHub cho WebApp V2.0
+// Người dùng có thể chỉnh sửa trực tiếp hoặc thông qua tab Cài đặt trên WebApp
 // ==============================================================================
 
 export const DEFAULT_CONFIG = {
   // 1. Cấu hình Firebase Realtime Database
-  // Hãy thay thế bằng thông tin Firebase của bạn
   firebase: {
-    apiKey: "YOUR_API_KEY",
+    apiKey: "YOUR_FIREBASE_API_KEY",
     databaseURL: "https://your-project-id-default-rtdb.firebaseio.com",
     projectId: "your-project-id"
   },
@@ -20,12 +19,15 @@ export const DEFAULT_CONFIG = {
   }
 };
 
-// Lưu và lấy cấu hình từ LocalStorage để thuận tiện thử nghiệm trực tiếp trên trình duyệt
 export function loadUserConfig() {
-  const saved = localStorage.getItem("clothesline_config");
+  const saved = localStorage.getItem("clothesline_config_v2");
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      return {
+        firebase: { ...DEFAULT_CONFIG.firebase, ...(parsed.firebase || {}) },
+        github: { ...DEFAULT_CONFIG.github, ...(parsed.github || {}) }
+      };
     } catch (e) {
       console.error("Lỗi đọc cấu hình LocalStorage:", e);
     }
@@ -34,6 +36,5 @@ export function loadUserConfig() {
 }
 
 export function saveUserConfig(cfg) {
-  localStorage.setItem("clothesline_config", JSON.stringify(cfg));
+  localStorage.setItem("clothesline_config_v2", JSON.stringify(cfg));
 }
-

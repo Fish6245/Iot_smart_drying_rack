@@ -1,10 +1,9 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "files": [
     "main.py",
     "ota.py",
     "ads1x15.py"
   ],
-  "changelog": "Khởi tạo hệ thống giàn phơi thông minh IoT: Đọc cảm biến ADS1115 (Mưa/LDR), DHT22, điều khiển Servo SG90, đồng bộ Firebase và cập nhật OTA từ GitHub."
+  "changelog": "Bản cập nhật V2.0: Kiến trúc SPA 3 trang (Tổng quan, Biểu đồ lịch sử Chart.js, Cài đặt & Hẹn giờ). Đồng bộ thời gian thực NTP (UTC+7), quy tắc ưu tiên chống mưa (Rain Priority Override), thống kê thời gian phơi trong ngày và cơ chế bảo trì OTA/Reset từ xa qua Firebase & GitHub."
 }
-

@@ -1,5 +1,6 @@
 # ==============================================================================
-# CẤU HÌNH HỆ THỐNG GIÀN PHƠI THÔNG MINH (WEMOS D1 R2 - ESP8266)
+# CẤU HÌNH HỆ THỐNG GIÀN PHƠI THÔNG MINH V2.0 (WEMOS D1 R2 - ESP8266)
+# MicroPython - Firebase Realtime Database - GitHub OTA
 # ==============================================================================
 
 def _load_env():
@@ -12,7 +13,6 @@ def _load_env():
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         k, v = line.split("=", 1)
-                        # Loại bỏ khoảng trắng và dấu nháy kép / nháy đơn
                         env[k.strip()] = v.strip().strip("'\"")
             break
         except OSError:
@@ -30,7 +30,7 @@ WIFI_PASSWORD = _env.get("WIFI_PASSWORD", "YOUR_WIFI_PASSWORD")
 FIREBASE_URL = _env.get("FIREBASE_URL", "https://your-project-id-default-rtdb.firebaseio.com")
 FIREBASE_AUTH = _env.get("FIREBASE_AUTH", "")  # Để trống nếu Database ở chế độ test rules
 
-# 3. Cấu hình GitHub OTA & Local OTA (Khi không dùng GitHub/Firebase)
+# 3. Cấu hình GitHub OTA & Local OTA
 GITHUB_USER = _env.get("GITHUB_USER", "chuvitvang")
 GITHUB_REPO = _env.get("GITHUB_REPO", "Iot_smart_drying_rack")
 GITHUB_BRANCH = _env.get("GITHUB_BRANCH", "main")
@@ -41,7 +41,7 @@ OTA_VERSION_URL = f"{GITHUB_RAW_BASE}/version.json"
 LOCAL_OTA_URL = _env.get("LOCAL_OTA_URL", "")
 
 # Phiên bản hiện hành của Firmware
-CURRENT_VERSION = "1.0.0"
+CURRENT_VERSION = "2.0.0"
 
 # 4. Sơ đồ chân GPIO (WeMos D1 R2)
 PIN_I2C_SCL = 5   # D1 (GPIO 5) -> SCL ADS1115
@@ -55,12 +55,12 @@ ADC_CHANNEL_RAIN = 0  # A0: Cảm biến mưa (WATER_A0)
 ADC_CHANNEL_LDR  = 1  # A1: Cảm biến quang trở (LDR_A1)
 
 # 5. Ngưỡng mặc định điều khiển tự động
-DEFAULT_RAIN_THRESHOLD  = 15000  # ADC < 15000 là có mưa (cần thu giàn phơi)
-DEFAULT_LIGHT_THRESHOLD = 10000  # ADC > 10000 là đủ nắng (có thể phơi đồ)
+DEFAULT_RAIN_THRESHOLD = 15000  # ADC < 15000: Có mưa (cần thu sào)
+DEFAULT_SUN_THRESHOLD  = 16000  # ADC > 16000: Có nắng
 
 # Góc quay Servo SG90 (Độ)
-SERVO_ANGLE_OUT = 90  # Đưa giàn phơi ra ngoài
-SERVO_ANGLE_IN  = 0   # Thu giàn phơi vào nhà
+SERVO_ANGLE_OUT = 90  # Đưa sào phơi ra ngoài (OPEN)
+SERVO_ANGLE_IN  = 0   # Thu sào phơi vào nhà (CLOSED)
 
-# Chu kỳ lặp vòng quét (giây)
-LOOP_INTERVAL_SEC = 2.5
+# Chu kỳ lặp vòng quét chính (giây)
+LOOP_INTERVAL_SEC = 2.0

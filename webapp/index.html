@@ -3,211 +3,230 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>IoT Smart Clothesline - Giàn Phơi Thông Minh</title>
+  <title>Smart Clothesline IoT Dashboard</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Thư viện Chart.js phục vụ Trang 2 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div class="container">
-    <!-- Header & Status Bar -->
-    <header>
-      <div class="brand">
-        <span class="brand-icon">👕</span>
-        <div>
-          <h1>Giàn Phơi Thông Minh IoT</h1>
-          <p>WeMos D1 R2 (ESP8266) &bull; MicroPython &bull; Firebase RTDB</p>
-        </div>
-      </div>
-      <div class="status-bar">
-        <span id="badge-connection" class="badge offline">
-          <span class="dot"></span>
-          <span id="conn-text">Đang kết nối...</span>
-        </span>
-        <span id="badge-mode" class="badge mode-auto">
-          Chế độ: <strong id="header-mode-text">AUTO</strong>
-        </span>
-        <span class="badge">
-          Firmware: <strong id="header-version-text">v1.0.0</strong>
-        </span>
-        <button id="btn-open-settings" class="btn btn-secondary" title="Cài đặt Firebase">
-          ⚙️ Cấu hình
-        </button>
-      </div>
-    </header>
-
-    <!-- Telemetry Cards -->
-    <div class="section-title">📊 GIÁM SÁT MÔI TRƯỜNG THỜI GIAN THỰC</div>
-    <div class="grid-telemetry">
-      <!-- Temperature -->
-      <div class="telemetry-card">
-        <div class="card-header">
-          <span>Nhiệt độ (DHT22)</span>
-          <span class="card-icon">🌡️</span>
-        </div>
-        <div class="card-value" id="temp-val">-- °C</div>
-        <div class="card-sub">Cảm biến DHT22 (GPIO 2)</div>
-      </div>
-
-      <!-- Humidity -->
-      <div class="telemetry-card">
-        <div class="card-header">
-          <span>Độ ẩm không khí</span>
-          <span class="card-icon">💧</span>
-        </div>
-        <div class="card-value" id="hum-val">-- %</div>
-        <div class="card-sub">Cảm biến DHT22 (GPIO 2)</div>
-      </div>
-
-      <!-- Rain Sensor -->
-      <div class="telemetry-card">
-        <div class="card-header">
-          <span>Mức độ mưa / ẩm</span>
-          <span class="card-icon">🌧️</span>
-        </div>
-        <div class="card-value" id="rain-val">-- %</div>
-        <div class="card-sub" id="rain-adc-sub">ADC raw: -- (ADS1115 A0)</div>
-      </div>
-
-      <!-- Light Sensor (LDR) -->
-      <div class="telemetry-card">
-        <div class="card-header">
-          <span>Cường độ ánh sáng</span>
-          <span class="card-icon">☀️</span>
-        </div>
-        <div class="card-value" id="light-val">-- %</div>
-        <div class="card-sub" id="light-adc-sub">ADC raw: -- (ADS1115 A1)</div>
-      </div>
+  <header class="app-header">
+    <div class="brand">
+      <h1>🌤️ Hệ Thống Sào Phơi Thông Minh</h1>
+      <span id="device-status" class="badge offline">Đang kết nối...</span>
     </div>
+    <nav class="tab-nav">
+      <button class="tab-btn active" data-target="tab-overview">1. Trang tổng quan</button>
+      <button class="tab-btn" data-target="tab-charts">2. Biểu đồ & Lịch sử</button>
+      <button class="tab-btn" data-target="tab-settings">3. Cài đặt & Hẹn giờ</button>
+    </nav>
+  </header>
 
-    <!-- Main Section: Control & OTA -->
-    <div class="grid-main">
-      <!-- Control Panel -->
-      <div class="panel-card">
-        <h2>🎮 BẢNG ĐIỀU KHIỂN XÀO PHƠI</h2>
-
-        <!-- Mode Toggle -->
-        <div class="control-row">
-          <div class="control-info">
-            <h4>Chế độ hoạt động</h4>
-            <p>AUTO: Tự động kéo theo mưa & nắng | MANUAL: Tùy chỉnh</p>
-          </div>
-          <button id="btn-toggle-mode" class="btn btn-primary" data-mode="AUTO">
-            Đổi sang MANUAL
-          </button>
-        </div>
-
-        <!-- Clothesline In/Out -->
-        <div class="control-row">
-          <div class="control-info">
-            <h4>Trạng thái giàn phơi</h4>
-            <p id="clothesline-status-desc">Đang thu trong nhà (0°)</p>
-          </div>
-          <button id="btn-toggle-clothesline" class="btn btn-success" data-out="false" disabled>
-            Đưa giàn ra ngoài
-          </button>
-        </div>
-
-        <!-- Thresholds -->
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Ngưỡng kích hoạt Mưa (rain_threshold)</span>
-            <span id="rain-thresh-val">15000</span>
-          </div>
-          <input type="range" id="slider-rain" min="2000" max="30000" step="500" value="15000">
-          <small class="card-sub">ADC nhỏ hơn ngưỡng sẽ tính là trời mưa</small>
-        </div>
-
-        <div class="slider-group">
-          <div class="slider-label">
-            <span>Ngưỡng kích hoạt Nắng (light_threshold)</span>
-            <span id="light-thresh-val">10000</span>
-          </div>
-          <input type="range" id="slider-light" min="2000" max="30000" step="500" value="10000">
-          <small class="card-sub">ADC lớn hơn ngưỡng sẽ tính là trời nắng</small>
-        </div>
-
-        <button id="btn-save-thresholds" class="btn btn-secondary">
-          💾 Lưu cấu hình ngưỡng lên Firebase
-        </button>
-      </div>
-
-      <!-- GitHub OTA Manager -->
-      <div class="panel-card">
-        <h2>🚀 CẬP NHẬT TỪ XA (GITHUB OTA)</h2>
-
-        <div class="ota-box">
-          <div class="ota-row">
-            <span>Phiên bản trên thiết bị:</span>
-            <strong id="device-ver">v1.0.0</strong>
-          </div>
-          <div class="ota-row">
-            <span>Phiên bản mới nhất trên GitHub:</span>
-            <strong id="github-ver" style="color: var(--accent-blue);">Đang kiểm tra...</strong>
-          </div>
-          <div class="ota-row">
-            <span>Trạng thái OTA thiết bị:</span>
-            <span id="ota-status-badge" class="badge">IDLE</span>
+  <main class="container">
+    <!-- ==================== TRANG 1: TỔNG QUAN ==================== -->
+    <section id="tab-overview" class="tab-content active">
+      <div class="grid-3">
+        <!-- Trạng thái Sào phơi & Điều khiển thủ công -->
+        <div class="card highlight-card">
+          <h3>Trạng thái Sào phơi (SG90 - D7)</h3>
+          <div class="state-display" id="clothesline-state-text">ĐANG MỞ</div>
+          <div class="btn-group">
+            <button id="btn-open-pole" class="btn btn-primary">Mở sào (Phơi đồ)</button>
+            <button id="btn-close-pole" class="btn btn-warning">Thu sào (Cất đồ)</button>
           </div>
         </div>
 
-        <div>
-          <h4 style="font-size: 0.9rem; margin-bottom: 6px;">Nội dung bản cập nhật (Changelog):</h4>
-          <div class="changelog-box" id="changelog-text">
-            Chưa có thông tin. Bấm nút bên dưới để kiểm tra từ GitHub Repository.
+        <!-- Trạng thái Thời tiết tại chỗ -->
+        <div class="card">
+          <h3>Xác thực Thời tiết Tại chỗ</h3>
+          <div class="status-row">
+            <span>Trạng thái thời tiết (A0):</span>
+            <strong id="rain-status-badge" class="tag tag-safe">Không mưa</strong>
+          </div>
+          <div class="status-row">
+            <span>Quang trở LDR (A1):</span>
+            <strong id="sun-status-badge" class="tag tag-sun">Có nắng</strong>
           </div>
         </div>
 
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-          <button id="btn-check-update" class="btn btn-secondary" style="flex: 1;">
-            🔍 Kiểm tra cập nhật
-          </button>
-          <button id="btn-trigger-ota" class="btn btn-amber" style="flex: 1;" disabled>
-            ⚡ Tiến hành OTA
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal Settings -->
-  <div id="modal-settings" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>⚙️ Cài đặt Kết nối</h3>
-        <button id="btn-close-settings" style="background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer;">✕</button>
-      </div>
-
-      <div class="form-group">
-        <label>Firebase Database URL:</label>
-        <input type="text" id="cfg-firebase-url" placeholder="https://<project-id>-default-rtdb.firebaseio.com">
-      </div>
-
-      <div class="form-group">
-        <label>Firebase API Key (tùy chọn):</label>
-        <input type="text" id="cfg-firebase-key" placeholder="AIzaSy...">
-      </div>
-
-      <div class="form-group">
-        <label>Firebase Project ID:</label>
-        <input type="text" id="cfg-firebase-project" placeholder="my-iot-project">
-      </div>
-
-      <div class="form-group">
-        <label>GitHub User / Repo:</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="cfg-github-user" placeholder="chuvitvang" style="width: 50%;">
-          <input type="text" id="cfg-github-repo" placeholder="Iot_smart_drying_rack" style="width: 50%;">
+        <!-- Dự báo từ API Thời tiết -->
+        <div class="card weather-api-card">
+          <h3>🌐 API Thời tiết Khu vực</h3>
+          <div id="api-weather-content">
+            <p class="weather-temp" id="api-temp">-- °C</p>
+            <p id="api-desc">Đang tải dữ liệu...</p>
+            <small id="api-wind">Gió: -- km/h | Độ ẩm khu vực: --%</small>
+          </div>
         </div>
       </div>
 
-      <div class="modal-actions">
-        <button id="btn-reset-settings" class="btn btn-secondary">Mặc định</button>
-        <button id="btn-save-settings" class="btn btn-primary">Lưu cài đặt</button>
-      </div>
-    </div>
-  </div>
+      <!-- Hàng 2: Thông số cảm biến Realtime -->
+      <h2 class="section-title">Giá trị Cảm biến Thời gian thực</h2>
+      <div class="grid-4">
+        <div class="card sensor-card">
+          <span class="sensor-label">Cảm biến nước A0 (ADS1115)</span>
+          <div class="sensor-value" id="val-water-a0">0</div>
+          <small id="sub-water-a0">ADC 16-bit (Độ ướt: 0%)</small>
+        </div>
 
-  <!-- Script Module -->
+        <div class="card sensor-card">
+          <span class="sensor-label">Quang trở LDR A1 (ADS1115)</span>
+          <div class="sensor-value" id="val-ldr-a1">0</div>
+          <small id="sub-ldr-a1">ADC 16-bit (Cường độ: 0%)</small>
+        </div>
+
+        <div class="card sensor-card">
+          <span class="sensor-label">Nhiệt độ môi trường (DHT22)</span>
+          <div class="sensor-value" id="val-temp">-- °C</div>
+          <small>Chân D4 (GPIO 2)</small>
+        </div>
+
+        <div class="card sensor-card">
+          <span class="sensor-label">Độ ẩm không khí (DHT22)</span>
+          <div class="sensor-value" id="val-hum">-- %</div>
+          <small>Chân D4 (GPIO 2)</small>
+        </div>
+      </div>
+
+      <!-- Hàng 3: Cơ chế Bảo trì (OTA Firmware GitHub & Reset) -->
+      <h2 class="section-title">Cơ chế Bảo trì (Update Firmware & Reset)</h2>
+      <div class="card maintenance-card">
+        <div class="maint-info">
+          <p><strong>Phiên bản hiện tại:</strong> <span id="curr-fw-ver">v2.0.0</span></p>
+          <p><strong>Phiên bản trên GitHub:</strong> <span id="git-fw-ver">Chưa kiểm tra</span></p>
+          <p><strong>Trạng thái tiến trình:</strong> <span id="ota-status-text" class="badge">IDLE</span></p>
+        </div>
+        <div class="maint-actions">
+          <button id="btn-check-ota" class="btn btn-outline">Kiểm tra bản cập nhật</button>
+          <button id="btn-update-ota" class="btn btn-success" disabled>Update Firmware (OTA)</button>
+          <button id="btn-reset-mcu" class="btn btn-danger">Reset thiết bị</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TRANG 2: BIỂU ĐỒ & LỊCH SỬ ==================== -->
+    <section id="tab-charts" class="tab-content">
+      <div class="grid-3">
+        <div class="card stat-card">
+          <h3>☀️ Thống kê thời gian phơi trong ngày</h3>
+          <div class="big-stat" id="stat-drying-time">0 giờ 0 phút</div>
+          <p>Tổng thời gian sào ở trạng thái MỞ trong hôm nay</p>
+        </div>
+
+        <div class="card stat-card" style="grid-column: span 2;">
+          <h3>Khung thời gian hiển thị biểu đồ</h3>
+          <div class="filter-group">
+            <label for="chart-limit">Lựa chọn khung dữ liệu lịch sử:</label>
+            <select id="chart-limit">
+              <option value="12">12 mốc gần nhất (~1 giờ)</option>
+              <option value="36" selected>36 mốc gần nhất (~3 giờ)</option>
+              <option value="72">72 mốc gần nhất (~6 giờ)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card chart-container">
+          <h3>Biểu đồ Nhiệt độ (°C) & Độ ẩm (%) - DHT22</h3>
+          <canvas id="dhtChart"></canvas>
+        </div>
+        <div class="card chart-container">
+          <h3>Biểu đồ Cảm biến Nước A0 & Quang trở LDR A1 (ADC)</h3>
+          <canvas id="adcChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TRANG 3: CÀI ĐẶT & HẸN GIỜ ==================== -->
+    <section id="tab-settings" class="tab-content">
+      <div class="card settings-card">
+        <h2>⏰ Cài đặt Lịch trình & Ưu tiên Thời tiết</h2>
+        
+        <div class="setting-item">
+          <div>
+            <h4>Bật/Tắt lịch tự động</h4>
+            <p>Tự động mở sào và thu sào theo khung giờ cố định hàng ngày</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-auto-schedule">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row-time">
+          <div class="time-box">
+            <label for="input-open-time">Cài giờ mở sào (Ví dụ 07:00):</label>
+            <input type="time" id="input-open-time" value="07:00">
+          </div>
+          <div class="time-box">
+            <label for="input-close-time">Cài giờ thu sào (Ví dụ 18:00):</label>
+            <input type="time" id="input-close-time" value="18:00">
+          </div>
+        </div>
+
+        <hr>
+
+        <div class="setting-item priority-box">
+          <div>
+            <h4>🌧️ Chế độ ưu tiên thu sào khi phát hiện mưa</h4>
+            <p>Tự động thu sào ngay lập tức khi cảm biến A0 phát hiện mưa, <strong>kể cả khi đang trong lịch phơi</strong>.</p>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="toggle-rain-priority" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <hr>
+
+        <h3>Hiệu chuẩn Ngưỡng Cảm biến (ADS1115 16-bit)</h3>
+        <div class="setting-row-time">
+          <div class="time-box">
+            <label for="input-rain-thresh">Ngưỡng phát hiện mưa A0 (ADC thấp hơn = Mưa):</label>
+            <input type="number" id="input-rain-thresh" value="15000" min="0" max="32767">
+          </div>
+          <div class="time-box">
+            <label for="input-sun-thresh">Ngưỡng xác thực trời nắng LDR A1 (ADC cao hơn = Nắng):</label>
+            <input type="number" id="input-sun-thresh" value="16000" min="0" max="32767">
+          </div>
+        </div>
+
+        <hr>
+
+        <h3>🔗 Cấu hình Kết nối Firebase & GitHub</h3>
+        <div class="form-group-settings">
+          <label for="input-cfg-db-url">Firebase Database URL:</label>
+          <input type="text" id="input-cfg-db-url" placeholder="https://your-project-id-default-rtdb.firebaseio.com">
+        </div>
+        <div class="setting-row-time">
+          <div class="time-box">
+            <label for="input-cfg-api-key">Firebase API Key (tùy chọn):</label>
+            <input type="text" id="input-cfg-api-key" placeholder="AIzaSy...">
+          </div>
+          <div class="time-box">
+            <label for="input-cfg-project-id">Firebase Project ID:</label>
+            <input type="text" id="input-cfg-project-id" placeholder="your-project-id">
+          </div>
+        </div>
+        <div class="setting-row-time">
+          <div class="time-box">
+            <label for="input-cfg-gh-user">GitHub User / Owner:</label>
+            <input type="text" id="input-cfg-gh-user" placeholder="chuvitvang">
+          </div>
+          <div class="time-box">
+            <label for="input-cfg-gh-repo">GitHub Repository:</label>
+            <input type="text" id="input-cfg-gh-repo" placeholder="Iot_smart_drying_rack">
+          </div>
+        </div>
+
+        <div class="save-actions">
+          <button id="btn-save-settings" class="btn btn-primary">Lưu Cài đặt</button>
+          <span id="save-toast" class="toast-msg"></span>
+        </div>
+      </div>
+    </section>
+  </main>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>
-

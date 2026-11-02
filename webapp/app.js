@@ -1,357 +1,424 @@
 // ==============================================================================
-// app.js - Logic Giao diện Bảng điều khiển Giàn phơi thông minh (Firebase Modular v10)
+// app.js - Logic Giao diện Bảng điều khiển Sào phơi thông minh (V2.0)
+// Tích hợp: Firebase RTDB Modular v10, Chart.js, Open-Meteo Weather API, GitHub OTA
 // ==============================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-import { loadUserConfig, saveUserConfig, DEFAULT_CONFIG } from "./config.js";
+import { getDatabase, ref, onValue, update, query, limitToLast } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { loadUserConfig, saveUserConfig } from "./config.js";
 
-// 1. TẢI CẤU HÌNH & KHỞI TẠO FIREBASE
+// 1. TẢI CẤU HÌNH HỆ THỐNG
 let currentConfig = loadUserConfig();
 let db = null;
-let deviceCurrentVersion = "1.0.0";
-let latestGithubVersion = null;
-let currentControlState = {
-  mode: "AUTO",
-  clothesline_out: false,
-  target_angle: 0,
-  rain_threshold: 15000,
-  light_threshold: 10000
-};
+let firebaseApp = null;
+let historyUnsubscribe = null;
 
+const WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast?latitude=10.8231&longitude=106.6297&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&timezone=Asia%2FBangkok";
+
+function getGithubVersionUrl() {
+  const user = currentConfig.github.user || "chuvitvang";
+  const repo = currentConfig.github.repo || "Iot_smart_drying_rack";
+  const branch = currentConfig.github.branch || "main";
+  return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/version.json`;
+}
+
+// Khởi tạo Firebase
 function initFirebase() {
-  if (!currentConfig.firebase.databaseURL || currentConfig.firebase.databaseURL.includes("your-project-id")) {
-    console.log("[*] Firebase URL chưa được cấu hình. Hoạt động ở chế độ độc lập.");
-    updateConnBadge(false, "Chưa kết nối Firebase (Bấm ⚙️ để nhập)");
+  const fbCfg = currentConfig.firebase;
+  if (!fbCfg || !fbCfg.databaseURL || fbCfg.databaseURL.includes("your-project-id")) {
+    console.warn("[*] Firebase URL chưa được cấu hình. Hoạt động ở chế độ chờ cấu hình.");
+    const statusBadge = document.getElementById('device-status');
+    if (statusBadge) {
+      statusBadge.innerText = "Chưa kết nối Firebase (Tab 3: Cài đặt)";
+      statusBadge.className = "badge offline";
+    }
     return;
   }
+
   try {
-    const app = initializeApp(currentConfig.firebase);
-    db = getDatabase(app);
+    firebaseApp = initializeApp(fbCfg);
+    db = getDatabase(firebaseApp);
     console.log("[+] Firebase đã được khởi tạo thành công");
     setupFirebaseListeners();
+    loadHistoryCharts(parseInt(document.getElementById('chart-limit')?.value || "36"));
   } catch (err) {
     console.error("[!] Lỗi khi khởi tạo Firebase:", err);
-    updateConnBadge(false, "Lỗi kết nối Firebase");
+    const statusBadge = document.getElementById('device-status');
+    if (statusBadge) {
+      statusBadge.innerText = "Lỗi kết nối Firebase";
+      statusBadge.className = "badge offline";
+    }
   }
 }
 
-// 2. LẮNG NGHE DỮ LIỆU THỜI GIAN THỰC (REALTIME LISTENERS)
+// ==================== ĐIỀU HƯỚNG TAB SPA ====================
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    const targetSection = document.getElementById(btn.dataset.target);
+    if (targetSection) {
+      targetSection.classList.add('active');
+    }
+  });
+});
+
+// ==================== KHỞI TẠO BIỂU ĐỒ (CHART.JS) ====================
+const dhtCanvas = document.getElementById('dhtChart');
+const adcCanvas = document.getElementById('adcChart');
+
+let dhtChart = null;
+let adcChart = null;
+
+if (dhtCanvas && typeof Chart !== "undefined") {
+  dhtChart = new Chart(dhtCanvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Nhiệt độ (°C)', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.3, fill: true },
+        { label: 'Độ ẩm (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+if (adcCanvas && typeof Chart !== "undefined") {
+  adcChart = new Chart(adcCanvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        { label: 'Cảm biến Nước A0 (ADC)', data: [], borderColor: '#0284c7', backgroundColor: 'rgba(2, 132, 199, 0.1)', tension: 0.3, fill: true },
+        { label: 'Quang trở LDR A1 (ADC)', data: [], borderColor: '#eab308', backgroundColor: 'rgba(234, 179, 8, 0.1)', tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' } }
+    }
+  });
+}
+
+function loadHistoryCharts(limitCount = 36) {
+  if (!db) return;
+  if (historyUnsubscribe) {
+    historyUnsubscribe();
+  }
+
+  const historyQuery = query(ref(db, 'smart_clothesline/history'), limitToLast(limitCount));
+  historyUnsubscribe = onValue(historyQuery, (snapshot) => {
+    const hist = snapshot.val();
+    if (!hist || !dhtChart || !adcChart) return;
+
+    const labels = [], temps = [], hums = [], waters = [], ldrs = [];
+    Object.keys(hist).sort().forEach(ts => {
+      const date = new Date(parseInt(ts) * 1000);
+      labels.push(date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+      temps.push(hist[ts].temp ?? null);
+      hums.push(hist[ts].hum ?? null);
+      waters.push(hist[ts].water_a0 ?? null);
+      ldrs.push(hist[ts].ldr_a1 ?? null);
+    });
+
+    dhtChart.data.labels = labels;
+    dhtChart.data.datasets[0].data = temps;
+    dhtChart.data.datasets[1].data = hums;
+    dhtChart.update();
+
+    adcChart.data.labels = labels;
+    adcChart.data.datasets[0].data = waters;
+    adcChart.data.datasets[1].data = ldrs;
+    adcChart.update();
+  });
+}
+
+document.getElementById('chart-limit')?.addEventListener('change', (e) => {
+  loadHistoryCharts(parseInt(e.target.value));
+});
+
+// ==================== LẮNG NGHE DỮ LIỆU FIREBASE ====================
 function setupFirebaseListeners() {
   if (!db) return;
 
-  // A. Giám sát Cảm biến (Telemetry)
+  // 1. Giám sát Cảm biến (Telemetry)
   const telemetryRef = ref(db, 'smart_clothesline/telemetry');
   onValue(telemetryRef, (snapshot) => {
     const data = snapshot.val();
     if (!data) return;
 
-    // Cập nhật Nhiệt độ & Độ ẩm
-    if (data.temperature !== undefined) {
-      document.getElementById('temp-val').innerText = `${Number(data.temperature).toFixed(1)} °C`;
-    }
-    if (data.humidity !== undefined) {
-      document.getElementById('hum-val').innerText = `${Number(data.humidity).toFixed(1)} %`;
-    }
-
-    // Quy đổi ADC ADS1115 (3.3V single-ended: ~26400)
-    if (data.rain_adc !== undefined) {
-      // Khi bề mặt ướt -> điện trở giảm -> ADC giảm -> rainPercent tăng
-      const rainPercent = Math.min(100, Math.max(0, Math.round((1 - data.rain_adc / 26400) * 100)));
-      document.getElementById('rain-val').innerText = `${rainPercent} %`;
-      document.getElementById('rain-adc-sub').innerText = `ADC raw: ${data.rain_adc} (ADS1115 A0)`;
+    // Trạng thái kết nối thiết bị
+    const nowSec = Math.floor(Date.now() / 1000);
+    const lastUp = data.last_updated || 0;
+    const isOnline = (nowSec - lastUp) < 30;
+    const statusBadge = document.getElementById('device-status');
+    if (statusBadge) {
+      statusBadge.innerText = isOnline ? "Trực tuyến (Online)" : "Mất kết nối (Offline)";
+      statusBadge.className = `badge ${isOnline ? 'online' : 'offline'}`;
     }
 
-    if (data.ldr_adc !== undefined) {
-      // Trời nắng gắt -> ADC cao -> lightPercent tăng
-      const lightPercent = Math.min(100, Math.max(0, Math.round((data.ldr_adc / 26400) * 100)));
-      document.getElementById('light-val').innerText = `${lightPercent} %`;
-      document.getElementById('light-adc-sub').innerText = `ADC raw: ${data.ldr_adc} (ADS1115 A1)`;
+    // Cảm biến nước A0 & Trạng thái mưa
+    const waterA0 = data.water_a0 ?? 0;
+    const wetPercent = Math.min(100, Math.max(0, Math.round((1 - waterA0 / 26400) * 100)));
+    const elWaterVal = document.getElementById('val-water-a0');
+    const elWaterSub = document.getElementById('sub-water-a0');
+    if (elWaterVal) elWaterVal.innerText = waterA0;
+    if (elWaterSub) elWaterSub.innerText = `ADC 16-bit (Độ ướt: ${wetPercent}%)`;
+
+    const rainBadge = document.getElementById('rain-status-badge');
+    if (rainBadge) {
+      rainBadge.innerText = data.is_raining ? "🌧️ Có mưa" : "☁️ Không mưa";
+      rainBadge.className = `tag ${data.is_raining ? 'tag-rain' : 'tag-safe'}`;
     }
 
-    // Kiểm tra trạng thái Online/Offline dựa vào độ trễ (Heartbeat)
-    if (data.last_updated) {
-      const nowEpoch = Math.floor(Date.now() / 1000);
-      const isOnline = (nowEpoch - data.last_updated) < 15; // Phản hồi trong vòng 15 giây
-      updateConnBadge(isOnline, isOnline ? "Thiết bị Online" : "Thiết bị mất kết nối");
+    // Quang trở LDR A1 & Xác thực nắng
+    const ldrA1 = data.ldr_a1 ?? 0;
+    const lightPercent = Math.min(100, Math.max(0, Math.round((ldrA1 / 26400) * 100)));
+    const elLdrVal = document.getElementById('val-ldr-a1');
+    const elLdrSub = document.getElementById('sub-ldr-a1');
+    if (elLdrVal) elLdrVal.innerText = ldrA1;
+    if (elLdrSub) elLdrSub.innerText = `ADC 16-bit (Cường độ: ${lightPercent}%)`;
+
+    const sunBadge = document.getElementById('sun-status-badge');
+    if (sunBadge) {
+      sunBadge.innerText = data.is_sunny ? "☀️ Có nắng" : "🌥️ Không nắng";
+      sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
+    }
+
+    // Cảm biến DHT22
+    const elTemp = document.getElementById('val-temp');
+    const elHum = document.getElementById('val-hum');
+    if (elTemp) elTemp.innerText = `${(data.temperature ?? 0).toFixed(1)} °C`;
+    if (elHum) elHum.innerText = `${(data.humidity ?? 0).toFixed(1)} %`;
+
+    // Trạng thái sào phơi
+    const poleState = document.getElementById('clothesline-state-text');
+    if (poleState) {
+      if (data.clothesline_state === "OPEN") {
+        poleState.innerText = "ĐANG MỞ";
+        poleState.style.color = "#16a34a";
+      } else {
+        poleState.innerText = "ĐANG THU";
+        poleState.style.color = "#d97706";
+      }
+    }
+
+    // Thống kê tổng thời gian phơi đồ trong ngày
+    const totalMinutes = data.sun_minutes_today ?? 0;
+    const statDrying = document.getElementById('stat-drying-time');
+    if (statDrying) {
+      statDrying.innerText = `${Math.floor(totalMinutes / 60)} giờ ${totalMinutes % 60} phút`;
     }
   });
 
-  // B. Giám sát Bảng điều khiển (Control)
+  // 2. Giám sát Cơ chế Bảo trì (Maintenance)
+  const maintRef = ref(db, 'smart_clothesline/maintenance');
+  onValue(maintRef, (snap) => {
+    const m = snap.val();
+    if (!m) return;
+    const curVer = document.getElementById('curr-fw-ver');
+    const otaStat = document.getElementById('ota-status-text');
+    if (curVer && m.current_version) curVer.innerText = `v${m.current_version}`;
+    if (otaStat && m.ota_status) otaStat.innerText = m.ota_status;
+  });
+
+  // 3. Giám sát Lịch trình (Schedule)
+  const scheduleRef = ref(db, 'smart_clothesline/schedule');
+  onValue(scheduleRef, (snap) => {
+    const s = snap.val();
+    if (!s) return;
+    const autoSchedule = document.getElementById('toggle-auto-schedule');
+    const openTime = document.getElementById('input-open-time');
+    const closeTime = document.getElementById('input-close-time');
+    const rainPriority = document.getElementById('toggle-rain-priority');
+
+    if (autoSchedule) autoSchedule.checked = !!s.auto_schedule_enabled;
+    if (openTime && s.open_time) openTime.value = s.open_time;
+    if (closeTime && s.close_time) closeTime.value = s.close_time;
+    if (rainPriority) rainPriority.checked = s.rain_priority_override !== false;
+  });
+
+  // 4. Giám sát Điều khiển & Ngưỡng (Control)
   const controlRef = ref(db, 'smart_clothesline/control');
-  onValue(controlRef, (snapshot) => {
-    const ctrl = snapshot.val();
-    if (!ctrl) return;
-
-    currentControlState = { ...currentControlState, ...ctrl };
-    updateControlUI(currentControlState);
-  });
-
-  // C. Giám sát Trạng thái Cập nhật OTA
-  const otaRef = ref(db, 'smart_clothesline/ota');
-  onValue(otaRef, (snapshot) => {
-    const ota = snapshot.val();
-    if (!ota) return;
-
-    if (ota.current_version) {
-      deviceCurrentVersion = ota.current_version;
-      document.getElementById('header-version-text').innerText = `v${deviceCurrentVersion}`;
-      document.getElementById('device-ver').innerText = `v${deviceCurrentVersion}`;
-    }
-
-    const otaStatus = ota.status || "IDLE";
-    const statusBadge = document.getElementById('ota-status-badge');
-    statusBadge.innerText = otaStatus;
-    statusBadge.className = "badge";
-
-    if (otaStatus === "DOWNLOADING" || otaStatus === "REQUESTED") {
-      statusBadge.classList.add("mode-manual");
-    } else if (otaStatus === "SUCCESS") {
-      statusBadge.classList.add("online");
-    } else if (otaStatus === "FAILED") {
-      statusBadge.classList.add("offline");
-    }
+  onValue(controlRef, (snap) => {
+    const c = snap.val();
+    if (!c) return;
+    const rainThresh = document.getElementById('input-rain-thresh');
+    const sunThresh = document.getElementById('input-sun-thresh');
+    if (rainThresh && c.rain_threshold) rainThresh.value = c.rain_threshold;
+    if (sunThresh && c.sun_threshold) sunThresh.value = c.sun_threshold;
   });
 }
 
-// 3. CẬP NHẬT GIAO DIỆN BẢNG ĐIỀU KHIỂN
-function updateControlUI(ctrl) {
-  const isAuto = ctrl.mode === "AUTO";
-  const btnToggleMode = document.getElementById('btn-toggle-mode');
-  const btnServo = document.getElementById('btn-toggle-clothesline');
-  const badgeMode = document.getElementById('badge-mode');
-  const headerModeText = document.getElementById('header-mode-text');
-  const clothesDesc = document.getElementById('clothesline-status-desc');
-
-  // Badge Header
-  headerModeText.innerText = ctrl.mode;
-  if (isAuto) {
-    badgeMode.className = "badge mode-auto";
-    btnToggleMode.innerText = "Đổi sang MANUAL";
-    btnToggleMode.className = "btn btn-primary";
-    btnToggleMode.dataset.mode = "AUTO";
-
-    btnServo.disabled = true;
-    btnServo.title = "Khóa ở chế độ AUTO (Hệ thống tự động điều khiển)";
-  } else {
-    badgeMode.className = "badge mode-manual";
-    btnToggleMode.innerText = "Đổi sang AUTO";
-    btnToggleMode.className = "btn btn-amber";
-    btnToggleMode.dataset.mode = "MANUAL";
-
-    btnServo.disabled = false;
-    btnServo.title = "Bấm để thu vào / đưa ra giàn phơi";
-  }
-
-  // Trạng thái giàn phơi
-  if (ctrl.clothesline_out) {
-    clothesDesc.innerText = `Đang phơi ngoài trời (Góc quay: ${ctrl.target_angle || 90}°)`;
-    btnServo.innerText = "Thu giàn vào trong";
-    btnServo.className = "btn btn-amber";
-    btnServo.dataset.out = "true";
-  } else {
-    clothesDesc.innerText = `Đã thu gọn trong nhà (Góc quay: ${ctrl.target_angle || 0}°)`;
-    btnServo.innerText = "Đưa giàn ra ngoài";
-    btnServo.className = "btn btn-success";
-    btnServo.dataset.out = "false";
-  }
-
-  // Cập nhật giá trị hiển thị trên Sliders
-  if (ctrl.rain_threshold !== undefined) {
-    document.getElementById('slider-rain').value = ctrl.rain_threshold;
-    document.getElementById('rain-thresh-val').innerText = ctrl.rain_threshold;
-  }
-  if (ctrl.light_threshold !== undefined) {
-    document.getElementById('slider-light').value = ctrl.light_threshold;
-    document.getElementById('light-thresh-val').innerText = ctrl.light_threshold;
-  }
-}
-
-function updateConnBadge(isOnline, text) {
-  const badge = document.getElementById('badge-connection');
-  const connText = document.getElementById('conn-text');
-  badge.className = `badge ${isOnline ? 'online' : 'offline'}`;
-  connText.innerText = text;
-}
-
-// 4. XỬ LÝ SỰ KIỆN TƯƠNG TÁC NGƯỜI DÙNG
-function bindUserEvents() {
-  // Đổi chế độ AUTO / MANUAL
-  document.getElementById('btn-toggle-mode').addEventListener('click', (e) => {
-    if (!db) return;
-    const currentMode = e.currentTarget.dataset.mode;
-    const newMode = currentMode === "AUTO" ? "MANUAL" : "AUTO";
-    update(ref(db, 'smart_clothesline/control'), { mode: newMode });
-  });
-
-  // Điều khiển vị trí giàn phơi (Servo SG90)
-  document.getElementById('btn-toggle-clothesline').addEventListener('click', (e) => {
-    if (!db) return;
-    const isOut = e.currentTarget.dataset.out === "true";
-    const nextOut = !isOut;
-    update(ref(db, 'smart_clothesline/control'), {
-      clothesline_out: nextOut,
-      target_angle: nextOut ? 90 : 0
-    });
-  });
-
-  // Thay đổi thanh trượt ngưỡng
-  const sliderRain = document.getElementById('slider-rain');
-  const sliderLight = document.getElementById('slider-light');
-
-  sliderRain.addEventListener('input', (e) => {
-    document.getElementById('rain-thresh-val').innerText = e.target.value;
-  });
-
-  sliderLight.addEventListener('input', (e) => {
-    document.getElementById('light-thresh-val').innerText = e.target.value;
-  });
-
-  // Lưu ngưỡng lên Firebase
-  document.getElementById('btn-save-thresholds').addEventListener('click', () => {
-    if (!db) return;
-    const rainVal = parseInt(sliderRain.value, 10);
-    const lightVal = parseInt(sliderLight.value, 10);
-    update(ref(db, 'smart_clothesline/control'), {
-      rain_threshold: rainVal,
-      light_threshold: lightVal
-    }).then(() => {
-      alert("Đã cập nhật ngưỡng kích hoạt thành công!");
-    }).catch((err) => {
-      alert("Lỗi khi lưu ngưỡng: " + err.message);
-    });
-  });
-
-  // Kiểm tra cập nhật GitHub OTA
-  document.getElementById('btn-check-update').addEventListener('click', checkGithubUpdate);
-
-  // Kích hoạt cập nhật OTA
-  document.getElementById('btn-trigger-ota').addEventListener('click', triggerOTA);
-
-  // Cấu hình Modal
-  setupSettingsModal();
-}
-
-// 5. QUẢN LÝ CẬP NHẬT GITHUB OTA
-async function checkGithubUpdate() {
-  const gh = currentConfig.github;
-  const versionUrl = `https://raw.githubusercontent.com/${gh.user}/${gh.repo}/${gh.branch}/version.json?t=${Date.now()}`;
-  const btnCheck = document.getElementById('btn-check-update');
-  const btnTrigger = document.getElementById('btn-trigger-ota');
-  const githubVerEl = document.getElementById('github-ver');
-  const changelogEl = document.getElementById('changelog-text');
-
-  btnCheck.disabled = true;
-  githubVerEl.innerText = "Đang kiểm tra...";
-
-  try {
-    const res = await fetch(versionUrl);
-    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
-    const data = await res.json();
-
-    latestGithubVersion = data.version;
-    githubVerEl.innerText = `v${data.version}`;
-    changelogEl.innerText = data.changelog || "Không có ghi chú thay đổi.";
-
-    // Cho phép kích hoạt OTA
-    btnTrigger.disabled = false;
-    if (data.version === deviceCurrentVersion) {
-      changelogEl.innerText += "\n\n(Thiết bị đã ở phiên bản mới nhất. Bạn vẫn có thể nạp lại nếu muốn).";
-    }
-  } catch (err) {
-    console.error("Lỗi kiểm tra GitHub OTA:", err);
-    githubVerEl.innerText = "Không thể lấy thông tin";
-    changelogEl.innerText = "Lỗi kết nối GitHub Raw API: " + err.message;
-    btnTrigger.disabled = true;
-  } finally {
-    btnCheck.disabled = false;
-  }
-}
-
-function triggerOTA() {
-  if (!latestGithubVersion) return;
-
-  if (!db || currentConfig.firebase.databaseURL.includes("your-project-id")) {
-    alert("⚠️ Bạn chưa cấu hình Firebase Database URL trên WebApp!\n\n💡 Để cập nhật OTA mà KHÔNG cần Firebase:\nNhấn và giữ nút nhấn cơ SW1 (GPIO 12) trên mạch trong 3 giây.\nThiết bị sẽ tự động tải firmware mới nhất trực tiếp từ GitHub về nạp!");
-    return;
-  }
-  const gh = currentConfig.github;
-  const downloadUrl = `https://raw.githubusercontent.com/${gh.user}/${gh.repo}/${gh.branch}/firmware/main.py`;
-
-  if (!confirm(`Bạn có chắc chắn muốn nạp Firmware phiên bản v${latestGithubVersion} từ xa vào ESP8266?`)) {
-    return;
-  }
-
-  update(ref(db, 'smart_clothesline/ota'), {
-    target_version: latestGithubVersion,
-    trigger_update: true,
-    status: "REQUESTED",
-    download_url: downloadUrl
-  }).then(() => {
-    alert("Yêu cầu cập nhật OTA đã được gửi tới thiết bị!");
-  }).catch((err) => {
-    alert("Lỗi khi gửi yêu cầu OTA: " + err.message);
-  });
-}
-
-// 6. CỬA SỔ CÀI ĐẶT CẤU HÌNH (SETTINGS MODAL)
-function setupSettingsModal() {
-  const modal = document.getElementById('modal-settings');
-  const btnOpen = document.getElementById('btn-open-settings');
-  const btnClose = document.getElementById('btn-close-settings');
-  const btnSave = document.getElementById('btn-save-settings');
-  const btnReset = document.getElementById('btn-reset-settings');
-
-  const inputUrl = document.getElementById('cfg-firebase-url');
-  const inputKey = document.getElementById('cfg-firebase-key');
-  const inputProj = document.getElementById('cfg-firebase-project');
-  const inputGhUser = document.getElementById('cfg-github-user');
-  const inputGhRepo = document.getElementById('cfg-github-repo');
-
-  function populateInputs() {
-    inputUrl.value = currentConfig.firebase.databaseURL || "";
-    inputKey.value = currentConfig.firebase.apiKey || "";
-    inputProj.value = currentConfig.firebase.projectId || "";
-    inputGhUser.value = currentConfig.github.user || "";
-    inputGhRepo.value = currentConfig.github.repo || "";
-  }
-
-  btnOpen.addEventListener('click', () => {
-    populateInputs();
-    modal.classList.add('active');
-  });
-
-  btnClose.addEventListener('click', () => {
-    modal.classList.remove('active');
-  });
-
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) modal.classList.remove('active');
-  });
-
-  btnReset.addEventListener('click', () => {
-    currentConfig = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
-    populateInputs();
-  });
-
-  btnSave.addEventListener('click', () => {
-    currentConfig.firebase.databaseURL = inputUrl.value.trim();
-    currentConfig.firebase.apiKey = inputKey.value.trim();
-    currentConfig.firebase.projectId = inputProj.value.trim();
-    currentConfig.github.user = inputGhUser.value.trim();
-    currentConfig.github.repo = inputGhRepo.value.trim();
-
-    saveUserConfig(currentConfig);
-    modal.classList.remove('active');
-    alert("Đã lưu cài đặt! Trang web sẽ được tải lại.");
-    window.location.reload();
-  });
-}
-
-// Khởi chạy ứng dụng
-document.addEventListener('DOMContentLoaded', () => {
-  bindUserEvents();
-  initFirebase();
-  checkGithubUpdate();
+// ==================== ĐIỀU KHIỂN THỦ CÔNG ====================
+document.getElementById('btn-open-pole')?.addEventListener('click', () => {
+  if (!db) { alert("Vui lòng cấu hình Firebase tại Tab 3 trước khi điều khiển!"); return; }
+  update(ref(db, 'smart_clothesline/control'), { manual_command: "OPEN", servo_angle: 90 });
 });
 
+document.getElementById('btn-close-pole')?.addEventListener('click', () => {
+  if (!db) { alert("Vui lòng cấu hình Firebase tại Tab 3 trước khi điều khiển!"); return; }
+  update(ref(db, 'smart_clothesline/control'), { manual_command: "CLOSE", servo_angle: 0 });
+});
+
+// ==================== TÍCH HỢP OPEN-METEO WEATHER API ====================
+async function fetchWeatherAPI() {
+  try {
+    const res = await fetch(WEATHER_API_URL);
+    const data = await res.json();
+    const cur = data.current;
+    const tempEl = document.getElementById('api-temp');
+    const descEl = document.getElementById('api-desc');
+    const windEl = document.getElementById('api-wind');
+
+    if (tempEl) tempEl.innerText = `${cur.temperature_2m} °C`;
+    if (descEl) {
+      descEl.innerText = cur.precipitation > 0
+        ? `🌧️ Khu vực có mưa (${cur.precipitation} mm)`
+        : `🌤️ Thời tiết khu vực khô ráo`;
+    }
+    if (windEl) {
+      windEl.innerText = `Gió: ${cur.wind_speed_10m} km/h | Độ ẩm: ${cur.relative_humidity_2m}%`;
+    }
+  } catch (e) {
+    const descEl = document.getElementById('api-desc');
+    if (descEl) descEl.innerText = "Lỗi tải API thời tiết";
+  }
+}
+fetchWeatherAPI();
+setInterval(fetchWeatherAPI, 300000); // 5 phút cập nhật 1 lần
+
+// ==================== CƠ CHẾ BẢO TRÌ (OTA & RESET) ====================
+let remoteGitData = null;
+
+document.getElementById('btn-check-ota')?.addEventListener('click', async () => {
+  const gitVerEl = document.getElementById('git-fw-ver');
+  const btnOta = document.getElementById('btn-update-ota');
+  if (gitVerEl) gitVerEl.innerText = "Đang kiểm tra...";
+
+  try {
+    const versionUrl = getGithubVersionUrl();
+    const res = await fetch(`${versionUrl}?t=${Date.now()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    remoteGitData = await res.json();
+
+    if (gitVerEl) gitVerEl.innerText = `v${remoteGitData.version}`;
+    const curr = document.getElementById('curr-fw-ver')?.innerText.replace('v', '') || "2.0.0";
+
+    if (btnOta) {
+      btnOta.disabled = (remoteGitData.version === curr);
+      btnOta.onclick = () => {
+        if (!db) { alert("Cần kết nối Firebase để gửi lệnh OTA!"); return; }
+        update(ref(db, 'smart_clothesline/maintenance'), {
+          target_version: remoteGitData.version,
+          trigger_ota: true,
+          ota_status: "REQUESTED"
+        });
+      };
+    }
+  } catch (e) {
+    console.error("Lỗi kiểm tra GitHub OTA:", e);
+    if (gitVerEl) gitVerEl.innerText = "Không thể kết nối GitHub";
+  }
+});
+
+document.getElementById('btn-reset-mcu')?.addEventListener('click', () => {
+  if (!db) { alert("Cần kết nối Firebase để gửi lệnh Reset!"); return; }
+  if (confirm("Xác nhận khởi động lại mạch WeMos D1 R2 (ESP8266)?")) {
+    update(ref(db, 'smart_clothesline/maintenance'), { trigger_reset: true });
+  }
+});
+
+// ==================== TRANG 3: CÀI ĐẶT & HẸN GIỜ ====================
+function populateConfigUI() {
+  const fb = currentConfig.firebase;
+  const gh = currentConfig.github;
+
+  const dbUrlInput = document.getElementById('input-cfg-db-url');
+  const apiKeyInput = document.getElementById('input-cfg-api-key');
+  const projInput = document.getElementById('input-cfg-project-id');
+  const ghUserInput = document.getElementById('input-cfg-gh-user');
+  const ghRepoInput = document.getElementById('input-cfg-gh-repo');
+
+  if (dbUrlInput && fb.databaseURL && !fb.databaseURL.includes("your-project-id")) {
+    dbUrlInput.value = fb.databaseURL;
+  }
+  if (apiKeyInput && fb.apiKey && !fb.apiKey.includes("YOUR_")) {
+    apiKeyInput.value = fb.apiKey;
+  }
+  if (projInput && fb.projectId && !projInput.value) {
+    projInput.value = fb.projectId;
+  }
+  if (ghUserInput) ghUserInput.value = gh.user || "chuvitvang";
+  if (ghRepoInput) ghRepoInput.value = gh.repo || "Iot_smart_drying_rack";
+}
+
+populateConfigUI();
+
+document.getElementById('btn-save-settings')?.addEventListener('click', async () => {
+  const autoSchedule = document.getElementById('toggle-auto-schedule')?.checked;
+  const openTime = document.getElementById('input-open-time')?.value || "07:00";
+  const closeTime = document.getElementById('input-close-time')?.value || "18:00";
+  const rainPriority = document.getElementById('toggle-rain-priority')?.checked;
+
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+
+  // Đọc cấu hình kết nối Firebase & GitHub
+  const newDbUrl = document.getElementById('input-cfg-db-url')?.value.trim();
+  const newApiKey = document.getElementById('input-cfg-api-key')?.value.trim();
+  const newProjectId = document.getElementById('input-cfg-project-id')?.value.trim();
+  const newGhUser = document.getElementById('input-cfg-gh-user')?.value.trim();
+  const newGhRepo = document.getElementById('input-cfg-gh-repo')?.value.trim();
+
+  let reconnectNeeded = false;
+  if (newDbUrl && newDbUrl !== currentConfig.firebase.databaseURL) {
+    currentConfig.firebase.databaseURL = newDbUrl;
+    reconnectNeeded = true;
+  }
+  if (newApiKey) currentConfig.firebase.apiKey = newApiKey;
+  if (newProjectId) currentConfig.firebase.projectId = newProjectId;
+  if (newGhUser) currentConfig.github.user = newGhUser;
+  if (newGhRepo) currentConfig.github.repo = newGhRepo;
+
+  saveUserConfig(currentConfig);
+
+  // Nếu Firebase đã kết nối, cập nhật schedule & control lên Firebase
+  if (db) {
+    try {
+      await update(ref(db, 'smart_clothesline/schedule'), {
+        auto_schedule_enabled: autoSchedule,
+        open_time: openTime,
+        close_time: closeTime,
+        rain_priority_override: rainPriority
+      });
+
+      await update(ref(db, 'smart_clothesline/control'), {
+        rain_threshold: rainThresh,
+        sun_threshold: sunThresh
+      });
+    } catch (err) {
+      console.error("Lỗi lưu lên Firebase:", err);
+    }
+  } else if (reconnectNeeded) {
+    initFirebase();
+  }
+
+  const toast = document.getElementById('save-toast');
+  if (toast) {
+    toast.innerText = "✓ Đã lưu cài đặt thành công!";
+    setTimeout(() => { toast.innerText = ""; }, 3000);
+  }
+});
+
+// Khởi chạy Firebase khi trang load
+initFirebase();

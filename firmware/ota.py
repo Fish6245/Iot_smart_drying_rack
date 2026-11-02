@@ -1,7 +1,7 @@
 # ==============================================================================
-# ota.py - Module Quản lý Cập nhật Firmware từ xa qua GitHub (OTA)
+# ota.py - Module Quản lý Cập nhật Firmware từ xa qua GitHub (OTA) V2.0
 # Hỗ trợ 2 chế độ:
-#   1. Có Firebase: Nhận lệnh cập nhật từ xa từ WebApp qua Firebase RTDB
+#   1. Có Firebase: Nhận lệnh cập nhật từ xa từ WebApp qua nhánh maintenance
 #   2. KHÔNG có Firebase: Tự động đối chiếu version.json trực tiếp từ GitHub
 # ==============================================================================
 import gc
@@ -14,19 +14,19 @@ def has_firebase():
     """Kiểm tra xem Firebase URL đã được cấu hình hợp lệ hay chưa"""
     return bool(config.FIREBASE_URL and "your-project-id" not in config.FIREBASE_URL)
 
-def update_firebase_ota_status(status, trigger_update=None, current_version=None):
-    """Cập nhật trạng thái tiến trình OTA lên Firebase Realtime Database (nếu có cấu hình)"""
+def update_firebase_maint_status(ota_status, trigger_ota=None, current_version=None):
+    """Cập nhật trạng thái tiến trình OTA lên Firebase /smart_clothesline/maintenance (nếu có cấu hình)"""
     if not has_firebase():
         return
 
     try:
-        url = f"{config.FIREBASE_URL}/smart_clothesline/ota.json"
+        url = f"{config.FIREBASE_URL}/smart_clothesline/maintenance.json"
         if config.FIREBASE_AUTH:
             url += f"?auth={config.FIREBASE_AUTH}"
-            
-        payload = {"status": status}
-        if trigger_update is not None:
-            payload["trigger_update"] = trigger_update
+
+        payload = {"ota_status": ota_status}
+        if trigger_ota is not None:
+            payload["trigger_ota"] = trigger_ota
         if current_version is not None:
             payload["current_version"] = current_version
 
@@ -41,7 +41,7 @@ def download_file(file_url, target_path):
     """Tải một file từ GitHub Raw và lưu vào hệ thống tệp Flash của ESP8266"""
     print(f"[OTA] Đang tải từ: {file_url} -> {target_path}...")
     temp_path = target_path + ".tmp"
-    
+
     res = None
     try:
         res = urequests.get(file_url)
@@ -52,7 +52,7 @@ def download_file(file_url, target_path):
         # Ghi nội dung vào file tạm
         with open(temp_path, "wb") as f:
             f.write(res.content)
-            
+
         res.close()
         res = None
         gc.collect()
@@ -71,8 +71,8 @@ def download_file(file_url, target_path):
         try:
             os.remove(target_path)
         except OSError:
-            pass # File đích chưa tồn tại
-            
+            pass
+
         os.rename(temp_path, target_path)
         print(f"[OTA] Đã cập nhật thành công: {target_path} ({stat[6]} bytes)")
         return True
@@ -89,27 +89,27 @@ def download_file(file_url, target_path):
             res.close()
         gc.collect()
 
-def perform_ota(ota_data):
+def perform_ota(maint_data):
     """
     Thực hiện quy trình nạp Firmware mới:
-    1. Đổi status thành DOWNLOADING (nếu có Firebase)
+    1. Đổi ota_status thành DOWNLOADING (nếu có Firebase)
     2. Tải main.py từ GitHub
-    3. Cập nhật version và status thành SUCCESS
+    3. Cập nhật version và ota_status thành SUCCESS, trigger_ota = False
     4. Reset vi điều khiển để chạy mã nguồn mới
     """
-    target_version = ota_data.get("target_version", config.CURRENT_VERSION)
-    download_url = ota_data.get("download_url") or f"{config.GITHUB_RAW_BASE}/firmware/main.py"
+    target_version = maint_data.get("target_version", config.CURRENT_VERSION)
+    download_url = maint_data.get("download_url") or f"{config.GITHUB_RAW_BASE}/firmware/main.py"
 
     print(f"[*] Bắt đầu tiến trình OTA lên phiên bản {target_version}...")
-    update_firebase_ota_status("DOWNLOADING")
+    update_firebase_maint_status(ota_status="DOWNLOADING")
 
     success = download_file(download_url, "main.py")
 
     if success:
         print(f"[+] Cập nhật thành công lên phiên bản v{target_version}! Đang khởi động lại...")
-        update_firebase_ota_status(
-            status="SUCCESS",
-            trigger_update=False,
+        update_firebase_maint_status(
+            ota_status="SUCCESS",
+            trigger_ota=False,
             current_version=target_version
         )
         import time
@@ -118,9 +118,9 @@ def perform_ota(ota_data):
         return True
     else:
         print("[-] Cập nhật OTA thất bại!")
-        update_firebase_ota_status(
-            status="FAILED",
-            trigger_update=False
+        update_firebase_maint_status(
+            ota_status="FAILED",
+            trigger_ota=False
         )
         return False
 
@@ -131,7 +131,6 @@ def check_and_update_github(force=False):
       1. Từ máy tính nội bộ trong mạng LAN (nếu có config.LOCAL_OTA_URL)
       2. Từ GitHub Repository
     """
-    # Nếu người dùng cấu hình tải từ máy tính nội bộ qua mạng LAN:
     if config.LOCAL_OTA_URL:
         print(f"[OTA] Đang cập nhật từ máy tính nội bộ (LAN): {config.LOCAL_OTA_URL}")
         return perform_ota({

@@ -1,12 +1,17 @@
 # ==============================================================================
-# main.py - Firmware Giàn Phơi Thông Minh (ESP8266 - MicroPython)
-# WeMos D1 R2 | Cảm biến ADS1115, DHT22 | Servo SG90 | Firebase | GitHub OTA
+# main.py - Firmware Giàn Phơi Thông Minh V2.0 (ESP8266 - MicroPython)
+# WeMos D1 R2 | ADS1115 (A0/A1), DHT22 (D4) | Servo SG90 (D7) | Firebase | GitHub OTA
 # ==============================================================================
 import gc
 import time
 import machine
 import dht
 import urequests
+
+try:
+    import ntptime
+except ImportError:
+    ntptime = None
 
 import config
 from ads1x15 import ADS1115
@@ -41,43 +46,78 @@ def set_servo_angle(angle):
     Sau khi quay xong, ngắt xung PWM (duty 0) để chống rung (jitter) và chống sụt áp.
     """
     angle = max(0, min(180, int(angle)))
-    # Ánh xạ 0-180 độ sang duty cycle 26-128 (đối với 10-bit PWM 50Hz trên ESP8266)
     duty = int(26 + (angle / 180.0) * (128 - 26))
     servo_pwm.duty(duty)
-    time.sleep_ms(500)   # Chờ động cơ quay đến vị trí
-    servo_pwm.duty(0)    # Ngắt xung giữ để tiết kiệm điện & chống rung lắc
+    time.sleep_ms(500)
+    servo_pwm.duty(0)
 
 # Khởi tạo trạng thái ban đầu của Servo (Thu vào)
 set_servo_angle(config.SERVO_ANGLE_IN)
 
-# ------------------------------------------------------------------------------
-# 2. KHỞI TẠO NÚT NHẤN CƠ HỌC SW1 (D6: GPIO 12)
-# Hỗ trợ 2 thao tác:
-#   - Nhấn nhả (< 3 giây): Đảo trạng thái giàn phơi (Thu vào / Đưa ra) & chuyển MANUAL
-#   - Nhấn giữ (>= 3 giây): Kích hoạt Cập nhật OTA trực tiếp từ GitHub (Không cần Firebase)
-# ------------------------------------------------------------------------------
+# Nút nhấn cơ học SW1 (D6: GPIO 12)
 button_pin = machine.Pin(config.PIN_BUTTON, machine.Pin.IN)
 
 # ------------------------------------------------------------------------------
-# 3. TRẠNG THÁI HỆ THỐNG
+# 2. ĐỒNG BỘ THỜI GIAN THỰC QUA NTP (UTC+7)
+# ------------------------------------------------------------------------------
+NTP_SYNCED = False
+UTC_OFFSET_SEC = 7 * 3600  # Múi giờ Việt Nam UTC+7 (+25200 giây)
+
+def sync_ntp_time():
+    global NTP_SYNCED
+    if not ntptime:
+        return False
+    try:
+        ntptime.host = "pool.ntp.org"
+        ntptime.settime()
+        NTP_SYNCED = True
+        print("[+] Đã đồng bộ thời gian NTP thành công.")
+        return True
+    except Exception as e:
+        print("[!] Chưa thể đồng bộ NTP:", e)
+        return False
+
+# Thử đồng bộ NTP ngay khi khởi động
+sync_ntp_time()
+
+def get_current_local_time():
+    """Lấy thời gian địa phương theo UTC+7: (year, month, day, hour, min, sec, time_str, epoch)"""
+    epoch = time.time()
+    local_epoch = epoch + UTC_OFFSET_SEC
+    tm = time.localtime(local_epoch)
+    time_str = f"{tm[3]:02d}:{tm[4]:02d}"
+    return tm, time_str, epoch
+
+# ------------------------------------------------------------------------------
+# 3. TRẠNG THÁI HỆ THỐNG V2.0
 # ------------------------------------------------------------------------------
 system_state = {
-    "mode": "AUTO",                 # "AUTO" hoặc "MANUAL"
-    "clothesline_out": False,       # True = Đang phơi ngoài, False = Thu vào
-    "target_angle": config.SERVO_ANGLE_IN,
+    # Telemetry
+    "clothesline_state": "CLOSED",      # "OPEN" hoặc "CLOSED"
+    "sun_minutes_today": 0,
+    "last_reset_day": -1,
+
+    # Control
+    "manual_command": "NONE",           # "OPEN", "CLOSE", "NONE"
+    "servo_angle": config.SERVO_ANGLE_IN,
     "rain_threshold": config.DEFAULT_RAIN_THRESHOLD,
-    "light_threshold": config.DEFAULT_LIGHT_THRESHOLD
+    "sun_threshold": config.DEFAULT_SUN_THRESHOLD,
+
+    # Schedule
+    "auto_schedule_enabled": True,
+    "open_time": "07:00",
+    "close_time": "18:00",
+    "rain_priority_override": True
 }
 
-# Kiểm tra xem Firebase đã được cấu hình hay chưa
 firebase_enabled = bool(config.FIREBASE_URL and "your-project-id" not in config.FIREBASE_URL)
 if firebase_enabled:
-    print("[+] Chế độ hoạt động: Đồng bộ Firebase Realtime Database")
+    print("[+] Chế độ hoạt động: Đồng bộ Firebase Realtime Database V2.0")
 else:
     print("[*] Chế độ hoạt động: Độc lập (Không dùng Firebase, tự động theo cảm biến & nút nhấn)")
 
 # ------------------------------------------------------------------------------
-# 4. CÁC HÀM GIAO TIẾP FIREBASE (REST API)
+# 4. GIAO TIẾP FIREBASE REST API
 # ------------------------------------------------------------------------------
 def build_fb_url(path):
     url = f"{config.FIREBASE_URL}/smart_clothesline/{path}.json"
@@ -85,16 +125,20 @@ def build_fb_url(path):
         url += f"?auth={config.FIREBASE_AUTH}"
     return url
 
-def push_telemetry(temp, hum, rain_adc, ldr_adc):
-    """Gửi dữ liệu cảm biến định kỳ lên Firebase (PATCH)"""
+def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny):
+    """Đẩy telemetry thời gian thực lên Firebase"""
     if not firebase_enabled:
         return
     url = build_fb_url("telemetry")
     payload = {
         "temperature": round(temp, 1),
         "humidity": round(hum, 1),
-        "rain_adc": rain_adc,
-        "ldr_adc": ldr_adc,
+        "water_a0": water_a0,
+        "is_raining": is_raining,
+        "ldr_a1": ldr_a1,
+        "is_sunny": is_sunny,
+        "clothesline_state": system_state["clothesline_state"],
+        "sun_minutes_today": system_state["sun_minutes_today"],
         "last_updated": time.time()
     }
     res = None
@@ -107,8 +151,29 @@ def push_telemetry(temp, hum, rain_adc, ldr_adc):
             res.close()
         gc.collect()
 
-def fetch_control_and_ota():
-    """Đọc lệnh điều khiển và cờ OTA từ Firebase (GET)"""
+def push_history_record(temp, hum, water_a0, ldr_a1, timestamp):
+    """Đẩy bản ghi lịch sử định kỳ lên /smart_clothesline/history/<timestamp>"""
+    if not firebase_enabled:
+        return
+    url = build_fb_url(f"history/{int(timestamp)}")
+    payload = {
+        "temp": round(temp, 1),
+        "hum": round(hum, 1),
+        "water_a0": water_a0,
+        "ldr_a1": ldr_a1
+    }
+    res = None
+    try:
+        res = urequests.put(url, json=payload)
+    except Exception as e:
+        print("[!] Lỗi lưu lịch sử:", e)
+    finally:
+        if res:
+            res.close()
+        gc.collect()
+
+def fetch_firebase_all():
+    """Đọc toàn bộ cây dữ liệu smart_clothesline từ Firebase (GET)"""
     if not firebase_enabled:
         return None
     url = f"{config.FIREBASE_URL}/smart_clothesline.json"
@@ -122,66 +187,83 @@ def fetch_control_and_ota():
         if res.status_code == 200:
             data = res.json()
     except Exception as e:
-        print("[!] Lỗi đọc lệnh từ Firebase:", e)
+        print("[!] Lỗi đọc Firebase:", e)
     finally:
         if res:
             res.close()
         gc.collect()
     return data
 
-def sync_control_to_firebase():
-    """Đồng bộ trạng thái điều khiển lên Firebase"""
+def update_firebase_maintenance_flag(key, val):
+    """Cập nhật cờ bảo trì trên Firebase"""
     if not firebase_enabled:
         return
-    url = build_fb_url("control")
-    payload = {
-        "mode": system_state["mode"],
-        "clothesline_out": system_state["clothesline_out"],
-        "target_angle": system_state["target_angle"]
-    }
+    url = build_fb_url("maintenance")
     res = None
     try:
-        res = urequests.patch(url, json=payload)
+        res = urequests.patch(url, json={key: val})
     except Exception as e:
-        print("[!] Lỗi đồng bộ control lên Firebase:", e)
+        pass
     finally:
         if res:
             res.close()
         gc.collect()
 
 # ------------------------------------------------------------------------------
-# 5. KIỂM TRA CẬP NHẬT GITHUB OTA KHI KHỞI ĐỘNG (TỰ ĐỘNG)
+# 5. KHỞI TẠO BAN ĐẦU TRÊN FIREBASE
 # ------------------------------------------------------------------------------
 try:
-    print("[*] Tự động kiểm tra phiên bản mới từ GitHub...")
+    print("[*] Kiểm tra phiên bản mới từ GitHub...")
     ota.check_and_update_github(force=False)
 except Exception as e:
     print("[!] Không thể kiểm tra OTA lúc khởi động:", e)
 
-# Khởi tạo trạng thái OTA trên Firebase nếu có
 if firebase_enabled:
     try:
-        init_res = urequests.patch(build_fb_url("ota"), json={
+        init_res = urequests.patch(build_fb_url("maintenance"), json={
             "current_version": config.CURRENT_VERSION,
-            "status": "IDLE",
-            "trigger_update": False
+            "target_version": config.CURRENT_VERSION,
+            "trigger_ota": False,
+            "trigger_reset": False,
+            "ota_status": "IDLE"
         })
         init_res.close()
     except:
         pass
 
+# Bộ đếm thời gian
+last_minute_tick = time.time()
+last_history_tick = time.time()
+last_ntp_sync_tick = time.time()
+
 # ------------------------------------------------------------------------------
 # 6. VÒNG LẶP CHÍNH (MAIN LOOP)
 # ------------------------------------------------------------------------------
-print("[+] Hệ thống giàn phơi thông minh sẵn sàng hoạt động!")
+print("[+] Hệ thống sào phơi thông minh V2.0 sẵn sàng hoạt động!")
 
 while True:
-    # --- A. XỬ LÝ NÚT NHẤN CƠ SW1 (Kèm nhận diện nhấn giữ để kích hoạt OTA) ---
-    if button_pin.value() == 0:  # Nút được nhấn (kéo xuống GND)
+    current_time_sec = time.time()
+
+    # Định kỳ thử đồng bộ lại NTP nếu chưa thành công (mỗi 10 phút)
+    if not NTP_SYNCED or (current_time_sec - last_ntp_sync_tick > 600):
+        last_ntp_sync_tick = current_time_sec
+        sync_ntp_time()
+
+    # Lấy thời gian thực
+    local_tm, current_time_str, epoch_now = get_current_local_time()
+    hour, minute, day = local_tm[3], local_tm[4], local_tm[2]
+
+    # Đặt lại bộ đếm phơi nắng lúc 00:00 hàng ngày
+    if hour == 0 and minute == 0 and system_state["last_reset_day"] != day:
+        system_state["sun_minutes_today"] = 0
+        system_state["last_reset_day"] = day
+        print("[*] 00:00 -> Đặt lại số phút phơi trong ngày về 0")
+
+    # --- A. XỬ LÝ NÚT NHẤN CƠ SW1 (GPIO 12) ---
+    if button_pin.value() == 0:
         press_start = time.ticks_ms()
         is_long_press = False
 
-        # Đo thời gian giữ nút
         while button_pin.value() == 0:
             time.sleep_ms(50)
             if time.ticks_diff(time.ticks_ms(), press_start) >= 3000:
@@ -189,24 +271,30 @@ while True:
                 break
 
         if is_long_press:
-            # Nhấn giữ > 3 giây: Kích hoạt OTA trực tiếp từ GitHub!
             print("\n" + "="*50)
-            print("[*] NHẬN DIỆN NHẤN GIỮ > 3 GIÂY!")
-            print("[*] Đang kích hoạt cập nhật OTA trực tiếp từ GitHub...")
+            print("[*] NHẬN DIỆN NHẤN GIỮ > 3 GIÂY -> KÍCH HOẠT OTA GITHUB!")
             print("="*50)
-            # Chờ người dùng thả nút ra trước khi tải
             while button_pin.value() == 0:
                 time.sleep_ms(50)
             ota.check_and_update_github(force=True)
         else:
-            # Nhấn nhả thông thường (< 3 giây): Đảo trạng thái giàn phơi
-            print("[*] Bấm nút SW1: Chuyển sang MANUAL & Đảo vị trí xào phơi")
-            system_state["mode"] = "MANUAL"
-            system_state["clothesline_out"] = not system_state["clothesline_out"]
-            system_state["target_angle"] = config.SERVO_ANGLE_OUT if system_state["clothesline_out"] else config.SERVO_ANGLE_IN
-            
-            set_servo_angle(system_state["target_angle"])
-            sync_control_to_firebase()
+            # Nhấn nhả: Đảo trạng thái sào phơi thủ công
+            new_target = "CLOSED" if system_state["clothesline_state"] == "OPEN" else "OPEN"
+            print(f"[*] Bấm nút SW1: Chuyển sào sang {new_target}")
+            system_state["manual_command"] = new_target
+            system_state["clothesline_state"] = new_target
+            system_state["servo_angle"] = config.SERVO_ANGLE_OUT if new_target == "OPEN" else config.SERVO_ANGLE_IN
+            set_servo_angle(system_state["servo_angle"])
+
+            if firebase_enabled:
+                try:
+                    res_m = urequests.patch(build_fb_url("control"), json={
+                        "manual_command": new_target,
+                        "servo_angle": system_state["servo_angle"]
+                    })
+                    res_m.close()
+                except:
+                    pass
 
     # --- B. ĐỌC DỮ LIỆU CẢM BIẾN ---
     temp, hum = 0.0, 0.0
@@ -217,70 +305,116 @@ while True:
     except Exception as e:
         pass
 
-    rain_adc = 0
-    ldr_adc = 0
+    water_a0 = 26400
+    ldr_a1 = 0
     if ads:
         try:
-            rain_adc = ads.read_raw(config.ADC_CHANNEL_RAIN)
-            ldr_adc = ads.read_raw(config.ADC_CHANNEL_LDR)
+            water_a0 = ads.read_raw(config.ADC_CHANNEL_RAIN)
+            ldr_a1 = ads.read_raw(config.ADC_CHANNEL_LDR)
         except Exception as e:
             pass
 
-    # --- C. ĐIỀU KHIỂN TỰ ĐỘNG (KHI Ở CHẾ ĐỘ AUTO) ---
-    if system_state["mode"] == "AUTO":
-        # Điều kiện mưa: ADC mưa < rain_threshold (nước làm dẫn điện, áp giảm)
-        is_raining = rain_adc < system_state["rain_threshold"]
-        # Điều kiện đủ nắng: ADC ánh sáng > light_threshold
-        is_sunny = ldr_adc > system_state["light_threshold"]
+    # Phân tích điều kiện thời tiết thực tế
+    is_raining = water_a0 < system_state["rain_threshold"]
+    is_sunny = ldr_a1 > system_state["sun_threshold"]
 
-        # Nếu mưa hoặc trời tối/râm -> Thu giàn phơi vào
-        # Nếu không mưa và có nắng -> Đưa giàn phơi ra
-        target_out = (not is_raining) and is_sunny
-
-        if target_out != system_state["clothesline_out"]:
-            system_state["clothesline_out"] = target_out
-            system_state["target_angle"] = config.SERVO_ANGLE_OUT if target_out else config.SERVO_ANGLE_IN
-            print(f"[AUTO] Chuyển đổi trạng thái: Out={target_out} (Mưa={is_raining}, Nắng={is_sunny})")
-            set_servo_angle(system_state["target_angle"])
-            sync_control_to_firebase()
-
-    # --- D. ĐỒNG BỘ VÀ LẮNG NGHE LỆNH TỪ FIREBASE (NẾU CÓ CẤU HÌNH) ---
+    # --- C. ĐỒNG BỘ CẤU HÌNH & LỆNH TỪ FIREBASE ---
     if firebase_enabled:
-        fb_root = fetch_control_and_ota()
+        fb_root = fetch_firebase_all()
         if fb_root and isinstance(fb_root, dict):
-            # 1. Cập nhật lệnh Control
+            # 1. Cấu hình ngưỡng & điều khiển thủ công
             ctrl = fb_root.get("control")
             if ctrl and isinstance(ctrl, dict):
-                if "rain_threshold" in ctrl:
-                    system_state["rain_threshold"] = ctrl["rain_threshold"]
-                if "light_threshold" in ctrl:
-                    system_state["light_threshold"] = ctrl["light_threshold"]
+                if "rain_threshold" in ctrl and ctrl["rain_threshold"] is not None:
+                    system_state["rain_threshold"] = int(ctrl["rain_threshold"])
+                if "sun_threshold" in ctrl and ctrl["sun_threshold"] is not None:
+                    system_state["sun_threshold"] = int(ctrl["sun_threshold"])
 
-                web_mode = ctrl.get("mode")
-                if web_mode in ("AUTO", "MANUAL") and web_mode != system_state["mode"]:
-                    system_state["mode"] = web_mode
-                    print(f"[*] Cập nhật Mode từ Web: {web_mode}")
+                cmd = ctrl.get("manual_command")
+                if cmd in ("OPEN", "CLOSE") and cmd != system_state["manual_command"]:
+                    print(f"[*] Nhận lệnh thủ công từ Firebase: {cmd}")
+                    system_state["manual_command"] = cmd
 
-                if system_state["mode"] == "MANUAL":
-                    web_out = ctrl.get("clothesline_out")
-                    if web_out is not None and web_out != system_state["clothesline_out"]:
-                        system_state["clothesline_out"] = web_out
-                        system_state["target_angle"] = ctrl.get("target_angle", config.SERVO_ANGLE_OUT if web_out else config.SERVO_ANGLE_IN)
-                        print(f"[*] Điều khiển Servo từ Web: Out={web_out}, Angle={system_state['target_angle']}")
-                        set_servo_angle(system_state["target_angle"])
+            # 2. Cấu hình lịch hẹn giờ
+            sch = fb_root.get("schedule")
+            if sch and isinstance(sch, dict):
+                if "auto_schedule_enabled" in sch:
+                    system_state["auto_schedule_enabled"] = bool(sch["auto_schedule_enabled"])
+                if "open_time" in sch and sch["open_time"]:
+                    system_state["open_time"] = sch["open_time"]
+                if "close_time" in sch and sch["close_time"]:
+                    system_state["close_time"] = sch["close_time"]
+                if "rain_priority_override" in sch:
+                    system_state["rain_priority_override"] = bool(sch["rain_priority_override"])
 
-            # 2. Kiểm tra cờ OTA Update
-            ota_cfg = fb_root.get("ota")
-            if ota_cfg and isinstance(ota_cfg, dict):
-                if ota_cfg.get("trigger_update") is True:
-                    print("[*] Phát hiện yêu cầu cập nhật OTA từ Firebase!")
-                    ota.perform_ota(ota_cfg)
+            # 3. Cơ chế bảo trì (Reset & OTA)
+            maint = fb_root.get("maintenance")
+            if maint and isinstance(maint, dict):
+                if maint.get("trigger_reset") is True:
+                    print("[*] Nhận lệnh khởi động lại (Reset) từ Web!")
+                    update_firebase_maintenance_flag("trigger_reset", False)
+                    time.sleep(1)
+                    machine.reset()
 
-        # Đẩy dữ liệu Telemetry lên Firebase
-        push_telemetry(temp, hum, rain_adc, ldr_adc)
+                if maint.get("trigger_ota") is True:
+                    print("[*] Nhận lệnh cập nhật OTA Firmware từ Web!")
+                    ota.perform_ota(maint)
 
-    # Thu gom rác bộ nhớ (Memory Management cho ESP8266)
+    # --- D. QUY TẮC ƯU TIÊN ĐIỀU KHIỂN SÀO PHƠI ---
+    # Mục tiêu dự kiến cho sào phơi: "OPEN" hoặc "CLOSED"
+    target_state = system_state["clothesline_state"]
+
+    # Mức ưu tiên 1: Chế độ ưu tiên chống mưa (Rain Priority Override)
+    if system_state["rain_priority_override"] and is_raining:
+        target_state = "CLOSED"
+
+    # Mức ưu tiên 2: Điều khiển thủ công (Manual Command)
+    elif system_state["manual_command"] in ("OPEN", "CLOSE"):
+        target_state = system_state["manual_command"]
+
+    # Mức ưu tiên 3: Lịch hẹn giờ tự động (Auto Schedule)
+    elif system_state["auto_schedule_enabled"]:
+        op_time = system_state["open_time"]
+        cl_time = system_state["close_time"]
+
+        # So sánh thời gian trong ngày
+        in_schedule = (op_time <= current_time_str < cl_time)
+        if in_schedule and not is_raining:
+            target_state = "OPEN"
+        else:
+            target_state = "CLOSED"
+
+    # Thực thi điều khiển Servo nếu trạng thái thay đổi
+    if target_state != system_state["clothesline_state"]:
+        system_state["clothesline_state"] = target_state
+        system_state["servo_angle"] = config.SERVO_ANGLE_OUT if target_state == "OPEN" else config.SERVO_ANGLE_IN
+        print(f"[POLE] Cập nhật vị trí sào phơi: {target_state} (Góc: {system_state['servo_angle']}°)")
+        set_servo_angle(system_state["servo_angle"])
+
+        if firebase_enabled:
+            try:
+                res_u = urequests.patch(build_fb_url("control"), {
+                    "servo_angle": system_state["servo_angle"]
+                })
+                res_u.close()
+            except:
+                pass
+
+    # --- E. THỐNG KÊ THỜI GIAN PHƠI NẮNG (MỖI 1 PHÚT) ---
+    if current_time_sec - last_minute_tick >= 60:
+        last_minute_tick = current_time_sec
+        if system_state["clothesline_state"] == "OPEN":
+            system_state["sun_minutes_today"] += 1
+
+    # --- F. GHI BẢN GHI LỊCH SỬ (MỖI 5 PHÚT) ---
+    if current_time_sec - last_history_tick >= 300:
+        last_history_tick = current_time_sec
+        push_history_record(temp, hum, water_a0, ldr_a1, epoch_now)
+
+    # --- G. ĐẨY DỮ LIỆU TELEMETRY LÊN FIREBASE ĐỊNH KỲ ---
+    push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny)
+
+    # Quản lý giải phóng RAM cho ESP8266
     gc.collect()
 
-    # Chờ chu kỳ tiếp theo
     time.sleep(config.LOOP_INTERVAL_SEC)
