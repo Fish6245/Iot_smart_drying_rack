@@ -6,9 +6,9 @@
 export const DEFAULT_CONFIG = {
   // 1. Cấu hình Firebase Realtime Database
   firebase: {
-    apiKey: "YOUR_FIREBASE_API_KEY",
-    databaseURL: "https://your-project-id-default-rtdb.firebaseio.com",
-    projectId: "your-project-id"
+    apiKey: "AIzaSy_DEFAULT_IOT_KEY",
+    databaseURL: "https://iotsmartdryingrack-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "iotsmartdryingrack-default-rtdb"
   },
 
   // 2. Cấu hình GitHub Repository phục vụ OTA

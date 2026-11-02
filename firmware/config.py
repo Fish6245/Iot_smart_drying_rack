@@ -6,7 +6,7 @@
 def _load_env():
     """Đọc cấu hình từ tệp .env (nếu có) trên bộ nhớ Flash vi điều khiển"""
     env = {}
-    for path in (".env", "firmware/.env"):
+    for path in (".env", "firmware/.env", ".evn", "../.env", "../.evn"):
         try:
             with open(path, "r") as f:
                 for line in f:
