@@ -259,26 +259,11 @@ while True:
         system_state["last_reset_day"] = day
         print("[*] 00:00 -> Đặt lại số phút phơi trong ngày về 0")
 
-    # --- A. XỬ LÝ NÚT NHẤN CƠ SW1 (GPIO 12) ---
+    # --- A. XỬ LÝ NÚT NHẤN CƠ SW1 (GPIO 12) - ĐÓNG / MỞ SÀO THỦ CÔNG TẠI CHỖ ---
     if button_pin.value() == 0:
-        press_start = time.ticks_ms()
-        is_long_press = False
-
-        while button_pin.value() == 0:
-            time.sleep_ms(50)
-            if time.ticks_diff(time.ticks_ms(), press_start) >= 3000:
-                is_long_press = True
-                break
-
-        if is_long_press:
-            print("\n" + "="*50)
-            print("[*] NHẬN DIỆN NHẤN GIỮ > 3 GIÂY -> KÍCH HOẠT OTA GITHUB!")
-            print("="*50)
-            while button_pin.value() == 0:
-                time.sleep_ms(50)
-            ota.check_and_update_github(force=True)
-        else:
-            # Nhấn nhả: Đảo trạng thái sào phơi thủ công
+        time.sleep_ms(50)  # Chống dội phím (debounce)
+        if button_pin.value() == 0:
+            # Đảo trạng thái sào phơi thủ công ngay lập tức (không cần chờ nhấn giữ)
             new_target = "CLOSED" if system_state["clothesline_state"] == "OPEN" else "OPEN"
             print(f"[*] Bấm nút SW1: Chuyển sào sang {new_target}")
             system_state["manual_command"] = new_target
@@ -295,6 +280,10 @@ while True:
                     res_m.close()
                 except:
                     pass
+
+            # Đợi nhả nút để tránh kích hoạt liên tục
+            while button_pin.value() == 0:
+                time.sleep_ms(20)
 
     # --- B. ĐỌC DỮ LIỆU CẢM BIẾN ---
     temp, hum = 0.0, 0.0

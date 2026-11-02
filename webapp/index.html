@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
   <!-- Thư viện Chart.js phục vụ Trang 2 -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
   <header class="app-header">
     <div class="brand">
@@ -18,6 +20,7 @@
       <button class="tab-btn active" data-target="tab-overview">1. Trang tổng quan</button>
       <button class="tab-btn" data-target="tab-charts">2. Biểu đồ & Lịch sử</button>
       <button class="tab-btn" data-target="tab-settings">3. Cài đặt & Hẹn giờ</button>
+      <button class="tab-btn" data-target="tab-maintenance">4. Bảo trì</button>
     </nav>
   </header>
 
@@ -86,21 +89,6 @@
           <small>Chân D4 (GPIO 2)</small>
         </div>
       </div>
-
-      <!-- Hàng 3: Cơ chế Bảo trì (OTA Firmware GitHub & Reset) -->
-      <h2 class="section-title">Cơ chế Bảo trì (Update Firmware & Reset)</h2>
-      <div class="card maintenance-card">
-        <div class="maint-info">
-          <p><strong>Phiên bản hiện tại:</strong> <span id="curr-fw-ver">v2.0.0</span></p>
-          <p><strong>Phiên bản trên GitHub:</strong> <span id="git-fw-ver">Chưa kiểm tra</span></p>
-          <p><strong>Trạng thái tiến trình:</strong> <span id="ota-status-text" class="badge">IDLE</span></p>
-        </div>
-        <div class="maint-actions">
-          <button id="btn-check-ota" class="btn btn-outline">Kiểm tra bản cập nhật</button>
-          <button id="btn-update-ota" class="btn btn-success" disabled>Update Firmware (OTA)</button>
-          <button id="btn-reset-mcu" class="btn btn-danger">Reset thiết bị</button>
-        </div>
-      </div>
     </section>
 
     <!-- ==================== TRANG 2: BIỂU ĐỒ & LỊCH SỬ ==================== -->
@@ -145,7 +133,7 @@
     <section id="tab-settings" class="tab-content">
       <div class="card settings-card">
         <h2>⏰ Cài đặt Lịch trình & Ưu tiên Thời tiết</h2>
-        
+
         <div class="setting-item">
           <div>
             <h4>Bật/Tắt lịch tự động</h4>
@@ -173,7 +161,8 @@
         <div class="setting-item priority-box">
           <div>
             <h4>🌧️ Chế độ ưu tiên thu sào khi phát hiện mưa</h4>
-            <p>Tự động thu sào ngay lập tức khi cảm biến A0 phát hiện mưa, <strong>kể cả khi đang trong lịch phơi</strong>.</p>
+            <p>Tự động thu sào ngay lập tức khi cảm biến A0 phát hiện mưa, <strong>kể cả khi đang trong lịch
+                phơi</strong>.</p>
           </div>
           <label class="switch">
             <input type="checkbox" id="toggle-rain-priority" checked>
@@ -226,6 +215,69 @@
         <div class="save-actions">
           <button id="btn-save-settings" class="btn btn-primary">Lưu Cài đặt</button>
           <span id="save-toast" class="toast-msg"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TRANG 4: BẢO TRÌ ==================== -->
+    <section id="tab-maintenance" class="tab-content">
+      <div class="card maint-page-card">
+        <div class="maint-page-header">
+          <h2>🛠️ Cơ chế Bảo trì & Cập nhật Firmware</h2>
+          <p class="section-desc">Quản lý phiên bản vi điều khiển WeMos D1 R2 (ESP8266), cập nhật mã nguồn OTA từ xa qua
+            GitHub và kích hoạt khởi động lại thiết bị an toàn.</p>
+        </div>
+
+        <div class="maint-grid-boxes">
+          <!-- Hộp thông tin phiên bản -->
+          <div class="maint-card-sub">
+            <h3>📦 Thông tin Phiên bản Hệ thống</h3>
+            <div class="status-row">
+              <span>Phiên bản Firmware trên mạch:</span>
+              <strong id="curr-fw-ver" class="badge online">v2.0.0</strong>
+            </div>
+            <div class="status-row">
+              <span>Phiên bản mới nhất trên GitHub:</span>
+              <strong id="git-fw-ver" class="badge">Chưa kiểm tra</strong>
+            </div>
+            <div class="status-row">
+              <span>Trạng thái tiến trình OTA:</span>
+              <strong id="ota-status-text" class="badge">IDLE</strong>
+            </div>
+          </div>
+
+          <!-- Hộp thao tác OTA & Reset -->
+          <div class="maint-card-sub">
+            <h3>⚡ Thao tác Bảo trì từ xa</h3>
+            <div class="maint-actions-vertical">
+              <button id="btn-check-ota" class="btn btn-outline" style="width: 100%;">
+                🔍 Kiểm tra bản cập nhật GitHub
+              </button>
+              <button id="btn-update-ota" class="btn btn-success" style="width: 100%;" disabled>
+                🚀 Update Firmware (OTA)
+              </button>
+              <button id="btn-reset-mcu" class="btn btn-danger" style="width: 100%;">
+                🔄 Reset thiết bị từ xa
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hướng dẫn và quy trình kỹ thuật -->
+        <div class="maint-guide">
+          <h3>📖 Quy trình & Hướng dẫn Kỹ thuật</h3>
+          <ul>
+            <li><strong>Cập nhật OTA 100% Không dây (Zero Hardware Touch):</strong> Hoàn toàn không cần chạm vào nút bấm
+              phần cứng. Bạn chỉ cần nhấn <em>"Kiểm tra bản cập nhật"</em> rồi bấm <em>"Update Firmware (OTA)"</em> trên
+              Web. Vi điều khiển ESP8266 sẽ tự động nhận lệnh qua Firebase, tải mã nguồn mới từ GitHub và tự khởi động
+              lại.</li>
+            <li><strong>Tự động kiểm tra khi cấp nguồn:</strong> Mỗi lần mạch khởi động lại, hệ thống sẽ tự đối chiếu
+              file <code>version.json</code> trên GitHub để tự động đồng bộ bản mới nhất.</li>
+            <li><strong>Khởi động lại từ xa (Soft Reset):</strong> Gửi cờ <code>trigger_reset = true</code> qua Firebase
+              để khởi động lại mạch an toàn mà không cần rút nguồn điện vật lý.</li>
+            <li><strong>Nút bấm cơ SW1 (D6 / GPIO 12):</strong> Dùng thuần túy để người dùng bấm đảo trạng thái đóng /
+              mở sào nhanh tại chỗ khi đứng cạnh giàn phơi.</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -339,4 +391,5 @@
 
   <script type="module" src="app.js"></script>
 </body>
+
 </html>

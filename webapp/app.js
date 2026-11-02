@@ -208,15 +208,8 @@ function updateUIWithTelemetry(data, isSimulated = false) {
   if (elHum) elHum.innerText = `${Number(data.humidity ?? 0).toFixed(1)} %`;
 
   // 5. Trạng thái sào phơi
-  const poleState = document.getElementById('clothesline-state-text');
-  if (poleState) {
-    if (data.clothesline_state === "OPEN") {
-      poleState.innerText = "ĐANG MỞ";
-      poleState.style.color = "#16a34a";
-    } else {
-      poleState.innerText = "ĐANG THU";
-      poleState.style.color = "#d97706";
-    }
+  if (data.clothesline_state) {
+    updateClotheslineUI(data.clothesline_state);
   }
 
   // 6. Thống kê thời gian phơi trong ngày
@@ -224,6 +217,27 @@ function updateUIWithTelemetry(data, isSimulated = false) {
   const statDrying = document.getElementById('stat-drying-time');
   if (statDrying) {
     statDrying.innerText = `${Math.floor(totalMinutes / 60)} giờ ${totalMinutes % 60} phút`;
+  }
+}
+
+// Hàm cập nhật trạng thái Sào phơi trực quan trên giao diện
+export function updateClotheslineUI(state) {
+  const poleState = document.getElementById('clothesline-state-text');
+  if (!poleState) return;
+  const isOpen = (state === "OPEN");
+  poleState.innerText = isOpen ? "ĐANG MỞ" : "ĐANG THU";
+  poleState.style.color = isOpen ? "#16a34a" : "#d97706";
+
+  const btnOpen = document.getElementById('btn-open-pole');
+  const btnClose = document.getElementById('btn-close-pole');
+  if (btnOpen && btnClose) {
+    if (isOpen) {
+      btnOpen.style.outline = "3px solid rgba(37, 99, 235, 0.4)";
+      btnClose.style.outline = "none";
+    } else {
+      btnClose.style.outline = "3px solid rgba(217, 119, 6, 0.4)";
+      btnOpen.style.outline = "none";
+    }
   }
 }
 
@@ -275,33 +289,52 @@ function setupFirebaseListeners() {
     const sunThresh = document.getElementById('input-sun-thresh');
     if (rainThresh && c.rain_threshold) rainThresh.value = c.rain_threshold;
     if (sunThresh && c.sun_threshold) sunThresh.value = c.sun_threshold;
+
+    // Lắng nghe lệnh điều khiển từ Firebase và cập nhật ngay lên GUI
+    if (c.manual_command === "OPEN") {
+      updateClotheslineUI("OPEN");
+    } else if (c.manual_command === "CLOSE") {
+      updateClotheslineUI("CLOSED");
+    }
   });
 }
 
 // ==================== ĐIỀU KHIỂN THỦ CÔNG ====================
 document.getElementById('btn-open-pole')?.addEventListener('click', () => {
+  // Cập nhật GUI tức thì (Optimistic UI)
+  updateClotheslineUI("OPEN");
+
   if (db) {
-    update(ref(db, 'smart_clothesline/control'), { manual_command: "OPEN", servo_angle: 90 });
-  } else {
-    // Cập nhật giả lập cục bộ khi không kết nối Firebase
-    const poleState = document.getElementById('clothesline-state-text');
-    if (poleState) {
-      poleState.innerText = "ĐANG MỞ";
-      poleState.style.color = "#16a34a";
-    }
+    // 1. Cập nhật nhánh Control để gửi lệnh đến MCU
+    update(ref(db, 'smart_clothesline/control'), { 
+      manual_command: "OPEN", 
+      servo_angle: 90 
+    }).catch(err => console.error("Lỗi gửi lệnh Mở sào:", err));
+
+    // 2. Đồng bộ nhánh Telemetry trên Firebase để mọi thiết bị/trình duyệt nhận diện ngay
+    update(ref(db, 'smart_clothesline/telemetry'), { 
+      clothesline_state: "OPEN",
+      servo_pos: 90
+    }).catch(err => console.error("Lỗi cập nhật telemetry:", err));
   }
 });
 
 document.getElementById('btn-close-pole')?.addEventListener('click', () => {
+  // Cập nhật GUI tức thì (Optimistic UI)
+  updateClotheslineUI("CLOSED");
+
   if (db) {
-    update(ref(db, 'smart_clothesline/control'), { manual_command: "CLOSE", servo_angle: 0 });
-  } else {
-    // Cập nhật giả lập cục bộ khi không kết nối Firebase
-    const poleState = document.getElementById('clothesline-state-text');
-    if (poleState) {
-      poleState.innerText = "ĐANG THU";
-      poleState.style.color = "#d97706";
-    }
+    // 1. Cập nhật nhánh Control để gửi lệnh đến MCU
+    update(ref(db, 'smart_clothesline/control'), { 
+      manual_command: "CLOSE", 
+      servo_angle: 0 
+    }).catch(err => console.error("Lỗi gửi lệnh Thu sào:", err));
+
+    // 2. Đồng bộ nhánh Telemetry trên Firebase để mọi thiết bị/trình duyệt nhận diện ngay
+    update(ref(db, 'smart_clothesline/telemetry'), { 
+      clothesline_state: "CLOSED",
+      servo_pos: 0
+    }).catch(err => console.error("Lỗi cập nhật telemetry:", err));
   }
 });
 
