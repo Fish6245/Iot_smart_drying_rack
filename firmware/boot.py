@@ -32,24 +32,28 @@ if button_pin.value() == 0:
 # ------------------------------------------------------------------------------
 def connect_wifi():
     """Kết nối vào mạng WiFi theo cấu hình trong config.py / .env"""
+    gc.collect()
     sta_if = network.WLAN(network.STA_IF)
     ap_if = network.WLAN(network.AP_IF)
     
     # Tắt Access Point để tiết kiệm RAM & tránh xung đột
     if ap_if.active():
         ap_if.active(False)
-        
-    if not sta_if.isconnected():
-        print(f"[*] Đang kết nối WiFi: {config.WIFI_SSID}...")
-        sta_if.active(True)
-        sta_if.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
-        
-        timeout = 15  # Tối đa 15 giây
-        while not sta_if.isconnected() and timeout > 0:
-            time.sleep(1)
-            timeout -= 1
-            print(".", end="")
-        print()
+
+    sta_if.active(True)
+    # Hủy trạng thái kết nối cũ hoặc lần thử còn dở trước khi bắt đầu lại.
+    sta_if.disconnect()
+    time.sleep(1)
+
+    print(f"[*] Đang kết nối WiFi: {config.WIFI_SSID}...")
+    sta_if.connect(config.WIFI_SSID, config.WIFI_PASSWORD)
+
+    timeout = 20  # Đồng nhất thời gian chờ với bài test WiFi độc lập
+    while not sta_if.isconnected() and timeout > 0:
+        time.sleep(1)
+        timeout -= 1
+        print(".", end="")
+    print()
 
     if sta_if.isconnected():
         print("[+] Kết nối WiFi thành công!")
@@ -64,7 +68,8 @@ def connect_wifi():
         except Exception:
             pass
     else:
-        print("[!] Không thể kết nối WiFi. Thiết bị sẽ chạy offline với cảm biến.")
+        print("[!] Không thể kết nối WiFi. Mã trạng thái:", sta_if.status())
+        print("[!] Thiết bị sẽ chạy offline với cảm biến.")
 
 # Thực hiện kết nối
 connect_wifi()

@@ -93,7 +93,7 @@ def perform_ota(maint_data):
     """
     Thực hiện quy trình nạp Firmware mới:
     1. Đổi ota_status thành DOWNLOADING (nếu có Firebase)
-    2. Tải main.py từ GitHub
+    2. Tải các module firmware và main.py từ GitHub
     3. Cập nhật version và ota_status thành SUCCESS, trigger_ota = False
     4. Reset vi điều khiển để chạy mã nguồn mới
     """
@@ -102,6 +102,24 @@ def perform_ota(maint_data):
 
     print(f"[*] Bắt đầu tiến trình OTA lên phiên bản {target_version}...")
     update_firebase_maint_status(ota_status="DOWNLOADING")
+
+    module_base_url = download_url.rsplit("/", 1)[0]
+    for module_name in (
+        "main_loop.py",
+        "main_io.py",
+        "main_sync.py",
+        "main_control.py",
+        "main_periodic.py",
+        "main_setup.py",
+        "main_firebase.py"
+    ):
+        if not download_file(module_base_url + "/" + module_name, module_name):
+            print("[-] OTA thất bại khi tải module:", module_name)
+            update_firebase_maint_status(
+                ota_status="FAILED",
+                trigger_ota=False
+            )
+            return False
 
     success = download_file(download_url, "main.py")
 
