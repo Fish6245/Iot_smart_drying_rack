@@ -3,21 +3,31 @@
 # MicroPython - Firebase Realtime Database - GitHub OTA
 # ==============================================================================
 
+
 def _load_env():
-    """Đọc cấu hình từ tệp .env (nếu có) trên bộ nhớ Flash vi điều khiển"""
+    """Đọc cấu hình config.ini, hỗ trợ nhiều kiểu xuống dòng."""
     env = {}
-    for path in (".env", "firmware/.env", ".evn", "../.env", "../.evn"):
-        try:
-            with open(path, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith("#") and "=" in line:
-                        k, v = line.split("=", 1)
-                        env[k.strip()] = v.strip().strip("'\"")
-            break
-        except OSError:
-            pass
+
+    try:
+        with open("/config.ini", "r") as f:
+            content = f.read()
+
+        # Chuẩn hóa kiểu xuống dòng
+        content = content.replace("\r\n", "\n")
+        content = content.replace("\r", "\n")
+
+        for line in content.split("\n"):
+            line = line.strip()
+
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip().strip("'\"")
+
+    except OSError as e:
+        print("[!] Loi doc config.ini:", e)
+
     return env
+
 
 _env = _load_env()
 
@@ -39,6 +49,7 @@ OTA_VERSION_URL = f"{GITHUB_RAW_BASE}/version.json"
 
 # Cập nhật qua máy tính trong mạng LAN (ví dụ: http://192.168.1.100:8000/main.py)
 LOCAL_OTA_URL = _env.get("LOCAL_OTA_URL", "")
+CHECK_GITHUB_OTA_ON_BOOT = _env.get("CHECK_GITHUB_OTA_ON_BOOT", "0") == "1"
 
 # Phiên bản hiện hành của Firmware
 CURRENT_VERSION = "2.0.0"
