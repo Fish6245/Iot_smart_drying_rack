@@ -274,10 +274,11 @@
         <div class="maint-guide">
           <h3>📖 Quy trình & Hướng dẫn Kỹ thuật</h3>
           <ul>
+            <li><strong>Cổng Cấu hình WiFi Thông minh (Captive Portal):</strong> Khi mạch chưa có WiFi hoặc đổi nhà/đổi mật khẩu, mạch tự phát WiFi <code>SaoPhoi-Setup</code> (IP: <code>192.168.4.1</code>). Kết nối điện thoại vào mạng này, trang cài đặt sẽ tự động bật lên để chọn WiFi và lưu mật khẩu mà không cần cắm máy tính.</li>
+            <li><strong>Đổi WiFi chủ động:</strong> Nhấn giữ nút nhấn SW1 (GPIO 12) trên 3 giây trong khi cắm nguồn để cưỡng bức mở Cổng cấu hình WiFi bất kỳ lúc nào.</li>
             <li><strong>Cập nhật OTA 100% Không dây (Zero Hardware Touch):</strong> Hoàn toàn không cần chạm vào nút bấm phần cứng. Bạn chỉ cần nhấn <em>"Kiểm tra bản cập nhật"</em> rồi bấm <em>"Update Firmware (OTA)"</em> trên Web. Vi điều khiển ESP8266 sẽ tự động nhận lệnh qua Firebase, tải mã nguồn mới từ GitHub và tự khởi động lại.</li>
             <li><strong>Tự động kiểm tra khi cấp nguồn:</strong> Mỗi lần mạch khởi động lại, hệ thống sẽ tự đối chiếu file <code>version.json</code> trên GitHub để tự động đồng bộ bản mới nhất.</li>
             <li><strong>Khởi động lại từ xa (Soft Reset):</strong> Gửi cờ <code>trigger_reset = true</code> qua Firebase để khởi động lại mạch an toàn mà không cần rút nguồn điện vật lý.</li>
-            <li><strong>Nút bấm cơ SW1 (D6 / GPIO 12):</strong> Dùng thuần túy để người dùng bấm đảo trạng thái đóng / mở sào nhanh tại chỗ khi đứng cạnh giàn phơi.</li>
           </ul>
         </div>
       </div>

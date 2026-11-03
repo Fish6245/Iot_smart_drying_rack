@@ -98,12 +98,22 @@ def perform_ota(maint_data):
     4. Reset vi điều khiển để chạy mã nguồn mới
     """
     target_version = maint_data.get("target_version", config.CURRENT_VERSION)
-    download_url = maint_data.get("download_url") or f"{config.GITHUB_RAW_BASE}/firmware/main.py"
+    download_url = maint_data.get("download_url")
 
     print(f"[*] Bắt đầu tiến trình OTA lên phiên bản {target_version}...")
     update_firebase_maint_status(ota_status="DOWNLOADING")
 
-    success = download_file(download_url, "main.py")
+    success = True
+    if download_url:
+        success = download_file(download_url, "main.py")
+    else:
+        # Cập nhật danh sách các module cốt lõi (bảo toàn config.py và .env)
+        files = maint_data.get("files") or ["main.py", "wifi_manager.py"]
+        for fname in files:
+            file_url = f"{config.GITHUB_RAW_BASE}/firmware/{fname}"
+            if not download_file(file_url, fname):
+                success = False
+                break
 
     if success:
         print(f"[+] Cập nhật thành công lên phiên bản v{target_version}! Đang khởi động lại...")

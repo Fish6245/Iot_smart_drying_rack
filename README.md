@@ -15,6 +15,7 @@ Iot_smart_drying_rack/
 ├── firmware/                # Mã nguồn MicroPython chạy trên WeMos D1 R2
 │   ├── boot.py              # Safe Boot chống brick, kết nối WiFi & WebREPL
 │   ├── config.py            # Cấu hình chân GPIO, ngưỡng cảm biến, WiFi & Firebase V2.0
+│   ├── wifi_manager.py      # Cổng cấu hình WiFi Captive Portal (SaoPhoi-Setup 192.168.4.1)
 │   ├── ads1x15.py           # Driver I2C đọc ADC ADS1115 (16-bit)
 │   ├── ota.py               # Quản lý cập nhật OTA qua nhánh maintenance & GitHub Raw
 │   └── main.py              # Luồng xử lý V2.0: NTP UTC+7, ưu tiên mưa, hẹn giờ, lịch sử
@@ -137,3 +138,17 @@ Iot_smart_drying_rack/
 4. **Cơ chế bảo trì từ xa:**
    - Khi `trigger_reset == True`: Reset mạch từ xa qua `machine.reset()`.
    - Khi `trigger_ota == True`: Tải bản firmware mới từ GitHub Raw URL, ghi đè Flash và khởi động lại an toàn.
+
+---
+
+## 📡 6. Cổng Cấu Hình WiFi Thông Minh (WiFi Captive Portal)
+
+Đối với người dùng mới hoặc khi mang thiết bị sang môi trường WiFi khác:
+1. **Tự động kích hoạt:** Nếu mạch không kết nối được WiFi sau 12 giây lúc bật nguồn, mạch tự động phát Access Point:
+   - **Tên WiFi:** `SaoPhoi-Setup` (mở, không cần mật khẩu).
+   - **Địa chỉ IP:** `192.168.4.1` (Tích hợp Tiny DNS Server tự động mở trang cấu hình trên điện thoại).
+2. **Kích hoạt chủ động:** Nhấn giữ nút nhấn cơ **SW1 (GPIO 12)** trên 3 giây trong khi cắm nguồn hoặc bấm RST.
+3. **Thao tác người dùng:**
+   - Kết nối điện thoại vào WiFi `SaoPhoi-Setup`.
+   - Chọn tên WiFi nhà bạn trong danh sách các mạng được quét sẵn và nhập mật khẩu.
+   - Bấm **"Lưu WiFi & Khởi Động Lại"**. Mạch sẽ tự lưu thông tin vào `.env` và kết nối Internet tự động.
