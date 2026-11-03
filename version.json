@@ -3,7 +3,8 @@
   "files": [
     "main.py",
     "ota.py",
+    "wifi_manager.py",
     "ads1x15.py"
   ],
-  "changelog": "Bản cập nhật V2.0: Kiến trúc SPA 3 trang (Tổng quan, Biểu đồ lịch sử Chart.js, Cài đặt & Hẹn giờ). Đồng bộ thời gian thực NTP (UTC+7), quy tắc ưu tiên chống mưa (Rain Priority Override), thống kê thời gian phơi trong ngày và cơ chế bảo trì OTA/Reset từ xa qua Firebase & GitHub."
+  "changelog": "Bản cập nhật V3.0: Tích hợp WiFi Captive Portal (SaoPhoi-Setup 192.168.4.1), Tab 4 Bảo trì chuyên biệt, ngưỡng xác thực độ ẩm DHT22, tối ưu nút bấm cơ SW1 phản hồi nhanh và cơ chế OTA 100% không dây."
 }

@@ -385,3 +385,4 @@ def start_portal(timeout_sec=180):
         return True
 
     return False
+
