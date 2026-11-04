@@ -87,25 +87,26 @@ CURRENT_VERSION = "2.0.0"
 # 4. Sơ đồ chân GPIO (WeMos D1 R2)
 PIN_I2C_SCL = 5   # D1 (GPIO 5) -> SCL ADS1115
 PIN_I2C_SDA = 4   # D2 (GPIO 4) -> SDA ADS1115
-PIN_DHT22   = 2   # D4 (GPIO 2) -> DATA DHT22
+PIN_DHT11   = 2   # D4 (GPIO 2) -> DATA DHT11
 PIN_BUTTON  = 12  # D6 (GPIO 12) -> Nút nhấn SW1 (External Pull-up 10k)
 PIN_SERVO   = 13  # D7 (GPIO 13) -> PWM Động cơ Servo SG90
 
 # Kênh trên module ADS1115 (0x48)
-ADC_CHANNEL_RAIN = 0  # A0: Cảm biến mưa (WATER_A0)
+ADC_CHANNEL_RAIN = 2  # A2: Cảm biến mưa (WATER_A2)
 ADC_CHANNEL_LDR  = 1  # A1: Cảm biến quang trở (LDR_A1)
 
 # 5. Ngưỡng mặc định điều khiển tự động
-DEFAULT_RAIN_THRESHOLD     = 15000  # ADC < 15000: Có mưa (cần thu sào)
-DEFAULT_SUN_THRESHOLD      = 16000  # ADC > 16000: Có nắng
+DEFAULT_RAIN_THRESHOLD     = 2000   # ADC > 2000: Có mưa (cần thu sào)
+DEFAULT_SUN_THRESHOLD      = 2000  # ADC > 2000: Có ánh sáng
 DEFAULT_HUMIDITY_THRESHOLD = 80.0   # Độ ẩm (%) > 80.0%: Quá ẩm (không đạt chuẩn phơi, thu sào)
 
 # Góc quay Servo SG90 (Độ)
-SERVO_ANGLE_OUT = 90  # ĐưE_IN  = 0   # Thu sào phơi vào nhà (CLOSED)
-SERVO_ANGLE_IN = 0
+SERVO_ANGLE_OUT = 0  
+SERVO_ANGLE_IN = 90 # SERVO_ANGLE_IN  = 90   # Thu sào phơi vào nhà (CLOSED)
 
 # Chu kỳ lặp vòng quét chính (giây)
 LOOP_INTERVAL_SEC = 2.0
 
 del _env
 del _load_env
+

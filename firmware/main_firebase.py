@@ -1,10 +1,12 @@
+UNIX_EPOCH_OFFSET = 946684800
+
 def build_fb_url(path):
     url = f"{config.FIREBASE_URL}/smart_clothesline/{path}.json"
     if config.FIREBASE_AUTH:
         url += f"?auth={config.FIREBASE_AUTH}"
     return url
 
-def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid):
+def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
     """Đẩy telemetry thời gian thực lên Firebase"""
     if not firebase_enabled:
         return
@@ -12,7 +14,7 @@ def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid):
     payload = {
         "temperature": round(temp, 1),
         "humidity": round(hum, 1),
-        "water_a0": water_a0,
+        "water_a0": water_a2,
         "is_raining": is_raining,
         "ldr_a1": ldr_a1,
         "is_sunny": is_sunny,
@@ -31,7 +33,7 @@ def push_telemetry(temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid):
             res.close()
         gc.collect()
 
-def push_history_record(temp, hum, water_a0, ldr_a1, timestamp):
+def push_history_record(temp, hum, water_a2, ldr_a1, timestamp):
     """Đẩy bản ghi lịch sử định kỳ lên /smart_clothesline/history/<timestamp>"""
     if not firebase_enabled:
         return
@@ -39,7 +41,7 @@ def push_history_record(temp, hum, water_a0, ldr_a1, timestamp):
     payload = {
         "temp": round(temp, 1),
         "hum": round(hum, 1),
-        "water_a0": water_a0,
+        "water_a0": water_a2,
         "ldr_a1": ldr_a1
     }
     res = None

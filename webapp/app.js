@@ -104,7 +104,7 @@ if (adcCanvas && typeof Chart !== "undefined") {
     data: {
       labels: [],
       datasets: [
-        { label: 'Cảm biến Nước A0 (ADC)', data: [], borderColor: '#0284c7', backgroundColor: 'rgba(2, 132, 199, 0.1)', tension: 0.3, fill: true },
+        { label: 'Cảm biến Nước A2 (ADC)', data: [], borderColor: '#0284c7', backgroundColor: 'rgba(2, 132, 199, 0.1)', tension: 0.3, fill: true },
         { label: 'Quang trở LDR A1 (ADC)', data: [], borderColor: '#eab308', backgroundColor: 'rgba(234, 179, 8, 0.1)', tension: 0.3, fill: true }
       ]
     },
@@ -173,13 +173,12 @@ function updateUIWithTelemetry(data, isSimulated = false) {
     }
   }
 
-  // 2. Cảm biến nước A0
-  const waterA0 = data.water_a0 ?? 0;
-  const wetPercent = Math.min(100, Math.max(0, Math.round((1 - waterA0 / 26400) * 100)));
+  // Firebase field water_a2 is retained for compatibility; the physical input is ADS1115 A2.
+  const waterA2 = data.water_a0 ?? 0;
   const elWaterVal = document.getElementById('val-water-a0');
   const elWaterSub = document.getElementById('sub-water-a0');
-  if (elWaterVal) elWaterVal.innerText = waterA0;
-  if (elWaterSub) elWaterSub.innerText = `ADC 16-bit (Độ ướt: ${wetPercent}%)`;
+  if (elWaterVal) elWaterVal.innerText = waterA2;
+  if (elWaterSub) elWaterSub.innerText = `ADC thô (ngưỡng mưa: > ${document.getElementById('input-rain-thresh')?.value || 200})`;
 
   const rainBadge = document.getElementById('rain-status-badge');
   if (rainBadge) {
@@ -189,11 +188,10 @@ function updateUIWithTelemetry(data, isSimulated = false) {
 
   // 3. Quang trở LDR A1
   const ldrA1 = data.ldr_a1 ?? 0;
-  const lightPercent = Math.min(100, Math.max(0, Math.round((ldrA1 / 26400) * 100)));
   const elLdrVal = document.getElementById('val-ldr-a1');
   const elLdrSub = document.getElementById('sub-ldr-a1');
   if (elLdrVal) elLdrVal.innerText = ldrA1;
-  if (elLdrSub) elLdrSub.innerText = `ADC 16-bit (Cường độ: ${lightPercent}%)`;
+  if (elLdrSub) elLdrSub.innerText = `ADC thô (có ánh sáng: > ${document.getElementById('input-sun-thresh')?.value || 2000})`;
 
   const sunBadge = document.getElementById('sun-status-badge');
   if (sunBadge) {
@@ -201,7 +199,7 @@ function updateUIWithTelemetry(data, isSimulated = false) {
     sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
   }
 
-  // 4. Nhiệt ẩm DHT22 & Xác thực độ ẩm
+  // 4. Nhiệt ẩm DHT11 & Xác thực độ ẩm
   const elTemp = document.getElementById('val-temp');
   const elHum = document.getElementById('val-hum');
   const humVal = Number(data.humidity ?? 0);
@@ -452,8 +450,8 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
   const closeTime = document.getElementById('input-close-time')?.value || "18:00";
   const rainPriority = document.getElementById('toggle-rain-priority')?.checked;
 
-  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
-  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "200");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "2000");
   const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
 
   const newDbUrl = document.getElementById('input-cfg-db-url')?.value.trim();
@@ -567,17 +565,17 @@ modeFirebase?.addEventListener('change', updateSimMode);
 
 // 3. Cập nhật nhãn khi kéo Slider
 function updateSliderLabels() {
-  const rain = parseInt(sliderRain?.value || "25000");
-  const ldr = parseInt(sliderLdr?.value || "22000");
+  const rain = parseInt(sliderRain?.value || "100");
+  const ldr = parseInt(sliderLdr?.value || "3000");
   const temp = parseFloat(sliderTemp?.value || "32.5");
   const hum = parseFloat(sliderHum?.value || "60.0");
 
-  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
-  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "200");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "2000");
   const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
 
   if (valRain) valRain.innerText = rain;
-  if (subRain) subRain.innerText = rain < rainThresh ? "(Đang mưa)" : "(Khô ráo)";
+  if (subRain) subRain.innerText = rain > rainThresh ? "(Đang mưa)" : "(Khô ráo)";
 
   if (valLdr) valLdr.innerText = ldr;
   if (subLdr) subLdr.innerText = ldr > sunThresh ? "(Nắng)" : "(Râm / Tối)";
@@ -595,17 +593,17 @@ function updateSliderLabels() {
 
 // 4. Áp dụng dữ liệu giả lập (Push / Apply)
 function applySimulatedData() {
-  const rain = parseInt(sliderRain?.value || "25000");
-  const ldr = parseInt(sliderLdr?.value || "22000");
+  const rain = parseInt(sliderRain?.value || "100");
+  const ldr = parseInt(sliderLdr?.value || "3000");
   const temp = parseFloat(sliderTemp?.value || "32.5");
   const hum = parseFloat(sliderHum?.value || "60.0");
 
-  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "15000");
-  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "16000");
+  const rainThresh = parseInt(document.getElementById('input-rain-thresh')?.value || "200");
+  const sunThresh = parseInt(document.getElementById('input-sun-thresh')?.value || "2000");
   const humThresh = parseFloat(document.getElementById('input-hum-thresh')?.value || "80.0");
   const rainPriority = document.getElementById('toggle-rain-priority')?.checked !== false;
 
-  const isRaining = rain < rainThresh;
+  const isRaining = rain > rainThresh;
   const isSunny = ldr > sunThresh;
   const isHumid = hum > humThresh;
 
@@ -647,10 +645,10 @@ document.getElementById('btn-sim-apply')?.addEventListener('click', applySimulat
 
 // 5. Kịch bản nhanh (Quick Scenarios)
 const scenarios = {
-  sunny: { rain: 25200, ldr: 23500, temp: 34.0, hum: 52.0 },
-  rainy: { rain: 6000, ldr: 7000, temp: 25.5, hum: 92.0 },
-  cloudy: { rain: 25500, ldr: 12000, temp: 28.5, hum: 70.0 },
-  night: { rain: 26000, ldr: 2200, temp: 23.5, hum: 84.0 }
+  sunny: { rain: 100, ldr: 3000, temp: 34.0, hum: 52.0 },
+  rainy: { rain: 500, ldr: 500, temp: 25.5, hum: 92.0 },
+  cloudy: { rain: 100, ldr: 1500, temp: 28.5, hum: 70.0 },
+  night: { rain: 100, ldr: 500, temp: 23.5, hum: 84.0 }
 };
 
 document.querySelectorAll('.sim-scenario-btn').forEach(btn => {
@@ -670,8 +668,8 @@ document.querySelectorAll('.sim-scenario-btn').forEach(btn => {
 
 // 6. Ghi 1 mốc dữ liệu vào Biểu đồ Lịch sử
 document.getElementById('btn-sim-push-hist')?.addEventListener('click', () => {
-  const rain = parseInt(sliderRain?.value || "25000");
-  const ldr = parseInt(sliderLdr?.value || "22000");
+  const rain = parseInt(sliderRain?.value || "100");
+  const ldr = parseInt(sliderLdr?.value || "3000");
   const temp = parseFloat(sliderTemp?.value || "32.5");
   const hum = parseFloat(sliderHum?.value || "60.0");
   const nowTs = Math.floor(Date.now() / 1000);
@@ -716,8 +714,8 @@ document.getElementById('btn-sim-push-hist')?.addEventListener('click', () => {
 
 // 7. Đặt lại mặc định
 document.getElementById('btn-sim-reset')?.addEventListener('click', () => {
-  if (sliderRain) sliderRain.value = 25000;
-  if (sliderLdr) sliderLdr.value = 22000;
+  if (sliderRain) sliderRain.value = 100;
+  if (sliderLdr) sliderLdr.value = 3000;
   if (sliderTemp) sliderTemp.value = 32.5;
   if (sliderHum) sliderHum.value = 60.0;
   updateSliderLabels();
@@ -736,7 +734,7 @@ document.getElementById('sim-toggle-auto')?.addEventListener('change', (e) => {
       // Thêm biến động ngẫu nhiên nhỏ
       curTemp = Math.min(42, Math.max(18, curTemp + (Math.random() - 0.5) * 0.4));
       curHum = Math.min(95, Math.max(30, curHum + (Math.random() - 0.5) * 0.8));
-      curLdr = Math.min(26400, Math.max(1000, curLdr + Math.round((Math.random() - 0.5) * 400)));
+      curLdr = Math.min(10000, Math.max(0, curLdr + Math.round((Math.random() - 0.5) * 400)));
 
       sliderTemp.value = curTemp.toFixed(1);
       sliderHum.value = curHum.toFixed(1);

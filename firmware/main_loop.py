@@ -18,12 +18,12 @@ def run_loop():
             print("[*] 00:00 -> Đặt lại số phút phơi trong ngày về 0")
 
         handle_button()
-        temp, hum, water_a0, is_raining, ldr_a1, is_sunny, is_humid = read_sensors()
+        temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid = read_sensors()
         sync_firebase_commands()
         apply_target_state(current_time_str, is_raining, is_humid)
         last_minute_tick, last_history_tick = periodic_updates(
             last_minute_tick, last_history_tick, current_time_sec,
-            temp, hum, water_a0, ldr_a1, is_raining, is_sunny, is_humid, epoch_now
+            temp, hum, water_a2, ldr_a1, is_raining, is_sunny, is_humid, epoch_now
         )
         gc.collect()
         time.sleep(config.LOOP_INTERVAL_SEC)

@@ -6,17 +6,18 @@
 export const DEFAULT_CONFIG = {
   // 1. Cấu hình Firebase Realtime Database
   firebase: {
-    apiKey: "AIzaSy_DEFAULT_IOT_KEY",
-    databaseURL: "https://iotsmartdryingrack-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "iotsmartdryingrack-default-rtdb"
+    apiKey: "AIzaSyD1OZ_WDrUGrKLDoOy6AhYncnVXaIWyN8c",
+    databaseURL:
+      "https://iot-group5-nlu-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "iotsmartdryingrack-default-rtdb",
   },
 
   // 2. Cấu hình GitHub Repository phục vụ OTA
   github: {
     user: "chuvitvang",
     repo: "Iot_smart_drying_rack",
-    branch: "main"
-  }
+    branch: "main",
+  },
 };
 
 export function loadUserConfig() {
@@ -26,7 +27,7 @@ export function loadUserConfig() {
       const parsed = JSON.parse(saved);
       return {
         firebase: { ...DEFAULT_CONFIG.firebase, ...(parsed.firebase || {}) },
-        github: { ...DEFAULT_CONFIG.github, ...(parsed.github || {}) }
+        github: { ...DEFAULT_CONFIG.github, ...(parsed.github || {}) },
       };
     } catch (e) {
       console.error("Lỗi đọc cấu hình LocalStorage:", e);

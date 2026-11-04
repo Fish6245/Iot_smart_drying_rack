@@ -1,6 +1,6 @@
 # ==============================================================================
 # main.py - Firmware Giàn Phơi Thông Minh V2.0 (ESP8266 - MicroPython)
-# WeMos D1 R2 | ADS1115 (A0/A1), DHT22 (D4) | Servo SG90 (D7) | Firebase | GitHub OTA
+# WeMos D1 R2 | ADS1115 (A1/A2), DHT11 (D4) | Servo SG90 (D7) | Firebase | GitHub OTA
 # ==============================================================================
 import gc
 import time
@@ -31,8 +31,8 @@ except Exception as e:
     ads = None
     print("[!] Lỗi khởi tạo ADS1115:", e)
 
-# Cảm biến nhiệt độ & độ ẩm DHT22 (D4: GPIO2)
-sensor_dht = dht.DHT22(machine.Pin(config.PIN_DHT22))
+# Cảm biến nhiệt độ & độ ẩm DHT11 (D4: GPIO2)
+sensor_dht = dht.DHT11(machine.Pin(config.PIN_DHT11))
 
 # Động cơ Servo SG90 (D7: GPIO13, PWM 50Hz)
 servo_pin = machine.Pin(config.PIN_SERVO)
