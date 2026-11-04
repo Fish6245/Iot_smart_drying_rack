@@ -482,6 +482,7 @@ document.getElementById('btn-save-settings')?.addEventListener('click', async ()
       });
 
       await update(ref(db, 'smart_clothesline/control'), {
+        manual_command: "NONE",
         rain_threshold: rainThresh,
         sun_threshold: sunThresh,
         humidity_threshold: humThresh

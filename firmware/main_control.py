@@ -16,8 +16,11 @@ def apply_target_state(current_time_str, is_raining, is_humid):
         op_time = system_state["open_time"]
         cl_time = system_state["close_time"]
 
-        # So sánh thời gian trong ngày (phơi khi trong lịch, không mưa và độ ẩm đạt chuẩn)
-        in_schedule = (op_time <= current_time_str < cl_time)
+        # Also support schedules that continue past midnight.
+        if op_time <= cl_time:
+            in_schedule = op_time <= current_time_str < cl_time
+        else:
+            in_schedule = current_time_str >= op_time or current_time_str < cl_time
         if in_schedule and not is_raining and not is_humid:
             target_state = "OPEN"
         else:
@@ -38,4 +41,3 @@ def apply_target_state(current_time_str, is_raining, is_humid):
                 res_u.close()
             except:
                 pass
-

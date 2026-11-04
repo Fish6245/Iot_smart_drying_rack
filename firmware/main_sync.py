@@ -12,8 +12,9 @@ def sync_firebase_commands():
                 system_state["humidity_threshold"] = float(ctrl["humidity_threshold"])
 
             cmd = ctrl.get("manual_command")
-            if cmd in ("OPEN", "CLOSE") and cmd != system_state["manual_command"]:
-                print(f"[*] Nhận lệnh thủ công từ Firebase: {cmd}")
+            if cmd in ("OPEN", "CLOSE", "NONE") and cmd != system_state["manual_command"]:
+                if cmd in ("OPEN", "CLOSE"):
+                    print(f"[*] Nhận lệnh thủ công từ Firebase: {cmd}")
                 system_state["manual_command"] = cmd
         ctrl = None
         gc.collect()
@@ -47,4 +48,3 @@ def sync_firebase_commands():
                 ota.perform_ota(maint)
         maint = None
         gc.collect()
-
