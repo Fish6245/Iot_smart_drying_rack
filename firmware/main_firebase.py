@@ -6,6 +6,38 @@ def build_fb_url(path):
         url += f"?auth={config.FIREBASE_AUTH}"
     return url
 
+def restore_sun_stats(today):
+    """Khôi phục bộ đếm phơi hôm nay từ telemetry để không mất khi board khởi động lại."""
+    if not firebase_enabled:
+        system_state["sun_minutes_date"] = today
+        return True
+
+    res = None
+    try:
+        res = urequests.get(build_fb_url("telemetry"))
+        if res.status_code != 200:
+            print("[!] Firebase trả về HTTP", res.status_code, "khi khôi phục thống kê")
+            return False
+
+        data = res.json()
+        if isinstance(data, dict) and data.get("sun_minutes_date") == today:
+            system_state["sun_minutes_today"] = max(0, int(data.get("sun_minutes_today", 0)))
+            remainder = float(data.get("sun_seconds_remainder", 0))
+            system_state["sun_seconds_remainder"] = max(0.0, min(remainder, 59.999))
+        else:
+            system_state["sun_minutes_today"] = 0
+            system_state["sun_seconds_remainder"] = 0.0
+        system_state["sun_minutes_date"] = today
+        print("[*] Đã khôi phục thống kê phơi hôm nay:", system_state["sun_minutes_today"], "phút")
+        return True
+    except Exception as e:
+        print("[!] Không thể khôi phục thống kê phơi:", e)
+        return False
+    finally:
+        if res:
+            res.close()
+        gc.collect()
+
 def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
     """Đẩy telemetry thời gian thực lên Firebase"""
     if not firebase_enabled:
@@ -20,9 +52,12 @@ def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
         "is_sunny": is_sunny,
         "is_humid": is_humid,
         "clothesline_state": system_state["clothesline_state"],
-        "sun_minutes_today": system_state["sun_minutes_today"],
         "last_updated": time.time()
     }
+    if system_state["sun_stats_loaded"]:
+        payload["sun_minutes_today"] = system_state["sun_minutes_today"]
+        payload["sun_seconds_remainder"] = system_state["sun_seconds_remainder"]
+        payload["sun_minutes_date"] = system_state["sun_minutes_date"]
     res = None
     try:
         res = urequests.patch(url, json=payload)

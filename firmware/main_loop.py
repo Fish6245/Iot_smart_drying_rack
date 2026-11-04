@@ -7,15 +7,20 @@ def run_loop():
     while True:
         current_time_sec = time.time()
         if not NTP_SYNCED or (current_time_sec - last_ntp_sync_tick > 600):
+            if sync_ntp_time():
+                current_time_sec = time.time()
+                last_minute_tick = current_time_sec
             last_ntp_sync_tick = current_time_sec
-            sync_ntp_time()
 
         local_tm, current_time_str, epoch_now = get_current_local_time()
-        hour, minute, day = local_tm[3], local_tm[4], local_tm[2]
-        if hour == 0 and minute == 0 and system_state["last_reset_day"] != day:
+        today = "{:04d}-{:02d}-{:02d}".format(local_tm[0], local_tm[1], local_tm[2])
+        if NTP_SYNCED and not system_state["sun_stats_loaded"]:
+            system_state["sun_stats_loaded"] = restore_sun_stats(today)
+        elif system_state["sun_stats_loaded"] and system_state["sun_minutes_date"] != today:
             system_state["sun_minutes_today"] = 0
-            system_state["last_reset_day"] = day
-            print("[*] 00:00 -> Đặt lại số phút phơi trong ngày về 0")
+            system_state["sun_seconds_remainder"] = 0.0
+            system_state["sun_minutes_date"] = today
+            print("[*] Sang ngày mới -> Đặt lại số phút phơi về 0")
 
         handle_button()
         temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid = read_sensors()

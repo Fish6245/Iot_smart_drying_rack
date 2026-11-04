@@ -93,7 +93,9 @@ system_state = {
     # Telemetry
     "clothesline_state": "CLOSED",      # "OPEN" hoặc "CLOSED"
     "sun_minutes_today": 0,
-    "last_reset_day": -1,
+    "sun_seconds_remainder": 0.0,
+    "sun_minutes_date": None,
+    "sun_stats_loaded": False,
 
     # Control
     "manual_command": "NONE",           # "OPEN", "CLOSE", "NONE"
