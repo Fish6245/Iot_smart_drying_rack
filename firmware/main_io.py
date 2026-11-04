@@ -1,29 +1,35 @@
+button_press_pending = False
+
+def button_irq_handler(_pin):
+    global button_press_pending
+    button_press_pending = True
+
 def handle_button():
+    global button_press_pending
+
     # --- A. XỬ LÝ NÚT NHẤN CƠ SW1 (GPIO 12) - ĐÓNG / MỞ SÀO THỦ CÔNG TẠI CHỖ ---
-    if button_pin.value() == 0:
-        time.sleep_ms(50)  # Chống dội phím (debounce)
-        if button_pin.value() == 0:
-            # Đảo trạng thái sào phơi thủ công ngay lập tức (không cần chờ nhấn giữ)
-            new_target = "CLOSED" if system_state["clothesline_state"] == "OPEN" else "OPEN"
-            print(f"[*] Bấm nút SW1: Chuyển sào sang {new_target}")
-            system_state["manual_command"] = new_target
-            system_state["clothesline_state"] = new_target
-            system_state["servo_angle"] = config.SERVO_ANGLE_OUT if new_target == "OPEN" else config.SERVO_ANGLE_IN
-            set_servo_angle(system_state["servo_angle"])
+    if not button_press_pending:
+        return
+    button_press_pending = False
+    time.sleep_ms(50)  # Chống dội phím (debounce)
+    button_press_pending = False
+    new_state = "CLOSED" if system_state["clothesline_state"] == "OPEN" else "OPEN"
+    manual_command = "CLOSE" if new_state == "CLOSED" else "OPEN"
+    print(f"[*] Bấm nút SW1: Chuyển sào sang {new_state}")
+    system_state["manual_command"] = manual_command
+    system_state["clothesline_state"] = new_state
+    system_state["servo_angle"] = config.SERVO_ANGLE_OUT if new_state == "OPEN" else config.SERVO_ANGLE_IN
+    set_servo_angle(system_state["servo_angle"])
 
-            if firebase_enabled:
-                try:
-                    res_m = urequests.patch(build_fb_url("control"), json={
-                        "manual_command": new_target,
-                        "servo_angle": system_state["servo_angle"]
-                    })
-                    res_m.close()
-                except:
-                    pass
-
-            # Đợi nhả nút để tránh kích hoạt liên tục
-            while button_pin.value() == 0:
-                time.sleep_ms(20)
+    if firebase_enabled:
+        try:
+            res_m = urequests.patch(build_fb_url("control"), json={
+                "manual_command": manual_command,
+                "servo_angle": system_state["servo_angle"]
+            })
+            res_m.close()
+        except Exception as e:
+            print("[!] Lỗi gửi lệnh nút SW1 lên Firebase:", e)
 
 
 def read_sensors():
