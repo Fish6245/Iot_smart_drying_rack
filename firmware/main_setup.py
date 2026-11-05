@@ -54,7 +54,7 @@ set_servo_angle(config.SERVO_ANGLE_IN)
 
 # Nút nhấn cơ học SW1 (D6: GPIO 12)
 button_pin = machine.Pin(config.PIN_BUTTON, machine.Pin.IN)
-button_pin.irq(trigger=machine.Pin.IRQ_FALLING, handler=button_irq_handler)
+button_pin.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, handler=button_irq_handler)
 
 # ------------------------------------------------------------------------------
 # 2. ĐỒNG BỘ THỜI GIAN THỰC QUA NTP (UTC+7)

@@ -14,8 +14,11 @@ for _part in (
     "main_setup.py",
     "main_firebase.py",
 ):
+    gc.collect()
     with open(_part, "r") as _source:
-        exec(_source.read(), globals())
+        _code = _source.read()
+    exec(_code, globals())
+    del _code
     gc.collect()
 del _part, _source
 
@@ -28,19 +31,6 @@ if config.CHECK_GITHUB_OTA_ON_BOOT:
         ota.check_and_update_github(force=False)
     except Exception as e:
         print("[!] Không thể kiểm tra OTA lúc khởi động:", e)
-
-if firebase_enabled:
-    try:
-        init_res = urequests.patch(build_fb_url("maintenance"), json={
-            "current_version": config.CURRENT_VERSION,
-            "target_version": config.CURRENT_VERSION,
-            "trigger_ota": False,
-            "trigger_reset": False,
-            "ota_status": "IDLE"
-        })
-        init_res.close()
-    except:
-        pass
 
 # Bộ đếm thời gian
 
