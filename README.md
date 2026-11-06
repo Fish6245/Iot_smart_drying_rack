@@ -36,7 +36,7 @@ Iot_smart_drying_rack/
 | **Module ADC ADS1115 (16-Bit)** | `D1_SCL` (Chân 15), `D2_SDA` (Chân 16), `ADDR` nối `GND` (`0x48`) | `GPIO 5` (SCL), `GPIO 4` (SDA) | `/smart_clothesline/telemetry` |
 | **Cảm biến mưa / nước (SEN1)** | Chân tín hiệu `S` nối kênh `A0` của ADS1115 (`WATER_A0`) | Giao tiếp I2C (Kênh 0) | `/telemetry/water_a0` & `/telemetry/is_raining` |
 | **Quang trở LDR1** | Phân áp qua trở `R2 (10k)` nối kênh `A1` của ADS1115 (`LDR_A1`) | Giao tiếp I2C (Kênh 1) | `/telemetry/ldr_a1` & `/telemetry/is_sunny` |
-| **Cảm biến nhiệt ẩm DHT22** | Chân `Out` nối chân `D4_LED` (`DHT22_D4`) | `GPIO 2` | `/telemetry/temperature`, `/telemetry/humidity` |
+| **Cảm biến nhiệt ẩm DHT11** | Chân `Out` nối chân `D4_LED` (`DHT11_D4`) | `GPIO 2` | `/telemetry/temperature`, `/telemetry/humidity` |
 | **Nút nhấn cơ học (SW1)** | Trở kéo lên `R1 (10k)` lên `3V3`, nối vào `D6_MISO` (`BUTTON_D6`) | `GPIO 12` (Ngắt ngoài - IRQ) | `/control/manual_command` |
 | **Động cơ Servo SG90 (M1)** | Nguồn `5V` (lọc nhiễu tụ `C1 100uF`), xung PWM nối `D7_MOSI` (`SERVO_D7`) | `GPIO 13` (PWM 50 Hz) | `/control/servo_angle`, `/telemetry/clothesline_state` |
 
@@ -97,7 +97,7 @@ Iot_smart_drying_rack/
    - Trạng thái sào phơi: ĐANG MỞ / ĐANG THU, nút điều khiển thủ công **Mở sào (Phơi đồ)**, **Thu sào (Cất đồ)**.
    - Xác thực thời tiết tại chỗ: Thẻ báo Có mưa / Không mưa (`WATER_A0`) và Có nắng / Không nắng (`LDR_A1`).
    - Tích hợp **Open-Meteo Weather API**: Nhiệt độ ngoài trời, lượng mưa, tốc độ gió và độ ẩm khu vực.
-   - 4 thẻ cảm biến thời gian thực: Cảm biến nước A0 (kèm % độ ướt), Quang trở LDR A1 (kèm % cường độ sáng), Nhiệt độ và Độ ẩm DHT22.
+   - 4 thẻ cảm biến thời gian thực: Cảm biến nước A0 (kèm % độ ướt), Quang trở LDR A1 (kèm % cường độ sáng), Nhiệt độ và Độ ẩm DHT11.
    - Khối bảo trì: Kiểm tra bản cập nhật GitHub, kích hoạt **Update Firmware (OTA)** và nút **Reset thiết bị**.
 
 2. **Trang 2: Trang Biểu đồ và Lịch sử (Charts & Analytics):**
@@ -113,7 +113,7 @@ Iot_smart_drying_rack/
 
 4. **🛠️ Dev Simulator Bar (Công cụ mô phỏng & kiểm thử ngoại vi):**
    - **Kịch bản nhanh (Quick Scenarios):** ☀️ Nắng to (Phơi đồ), 🌧️ Đổ mưa (Thu sào khẩn cấp), 🌥️ Râm mát / Tối, 🌙 Đêm khuya.
-   - **Thanh trượt điều khiển thủ công:** Cảm biến Nước A0 (ADS1115), Quang trở LDR A1, Nhiệt độ và Độ ẩm DHT22.
+   - **Thanh trượt điều khiển thủ công:** Cảm biến Nước A0 (ADS1115), Quang trở LDR A1, Nhiệt độ và Độ ẩm DHT11.
    - **2 chế độ kiểm thử:**
      - `Local Mock`: Cập nhật trực tiếp lên giao diện Dashboard & Biểu đồ mà không cần Firebase/mạng.
      - `Firebase Sync`: Đẩy dữ liệu giả lập trực tiếp lên Firebase Realtime Database để kiểm thử toàn diện cả hệ thống từ xa.

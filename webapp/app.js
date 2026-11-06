@@ -201,7 +201,7 @@ function updateUIWithTelemetry(data, isSimulated = false) {
     sunBadge.className = `tag ${data.is_sunny ? 'tag-sun' : 'tag-shade'}`;
   }
 
-  // 4. Nhiệt ẩm DHT22 & Xác thực độ ẩm
+  // 4. Nhiệt ẩm DHT11 & Xác thực độ ẩm
   const elTemp = document.getElementById('val-temp');
   const elHum = document.getElementById('val-hum');
   const humVal = Number(data.humidity ?? 0);
