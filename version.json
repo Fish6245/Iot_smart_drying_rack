@@ -1,10 +1,17 @@
 {
-  "version": "3.0.0",
+  "version": "3.1.0",
   "files": [
     "main.py",
+    "main_setup.py",
+    "main_io.py",
+    "main_firebase.py",
+    "main_control.py",
+    "main_sync.py",
+    "main_periodic.py",
+    "main_loop.py",
     "ota.py",
     "wifi_manager.py",
     "ads1x15.py"
   ],
-  "changelog": "Bản cập nhật: Tích hợp cảm biến nhiệt ẩm DHT11, WiFi Captive Portal (SaoPhoi-Setup 192.168.4.1), Tab 4 Bảo trì chuyên biệt, ngưỡng xác thực độ ẩm DHT11, tối ưu nút bấm cơ SW1 phản hồi nhanh và cơ chế OTA 100% không dây."
+  "changelog": "Bản cập nhật V3.1: Hợp nhất PR #1 (Modular hóa Firmware chống tràn RAM ESP8266, hỗ trợ config.ini uPyCraft, tối ưu Wi-Fi, map cảm biến nước A2, chuẩn hóa DHT11 và duy trì WiFi Captive Portal)."
 }

@@ -93,27 +93,37 @@ def perform_ota(maint_data):
     """
     Thực hiện quy trình nạp Firmware mới:
     1. Đổi ota_status thành DOWNLOADING (nếu có Firebase)
-    2. Tải main.py từ GitHub
+    2. Tải các module firmware và main.py từ GitHub
     3. Cập nhật version và ota_status thành SUCCESS, trigger_ota = False
     4. Reset vi điều khiển để chạy mã nguồn mới
     """
     target_version = maint_data.get("target_version", config.CURRENT_VERSION)
-    download_url = maint_data.get("download_url")
+    download_url = maint_data.get("download_url") or f"{config.GITHUB_RAW_BASE}/firmware/main.py"
 
     print(f"[*] Bắt đầu tiến trình OTA lên phiên bản {target_version}...")
     update_firebase_maint_status(ota_status="DOWNLOADING")
 
-    success = True
-    if download_url:
-        success = download_file(download_url, "main.py")
-    else:
-        # Cập nhật danh sách các module cốt lõi (bảo toàn config.py và .env)
-        files = maint_data.get("files") or ["main.py", "wifi_manager.py"]
-        for fname in files:
-            file_url = f"{config.GITHUB_RAW_BASE}/firmware/{fname}"
-            if not download_file(file_url, fname):
-                success = False
-                break
+    module_base_url = download_url.rsplit("/", 1)[0]
+    core_modules = (
+        "main_loop.py",
+        "main_io.py",
+        "main_sync.py",
+        "main_control.py",
+        "main_periodic.py",
+        "main_setup.py",
+        "main_firebase.py",
+        "wifi_manager.py"
+    )
+    for module_name in core_modules:
+        if not download_file(module_base_url + "/" + module_name, module_name):
+            print("[-] OTA thất bại khi tải module:", module_name)
+            update_firebase_maint_status(
+                ota_status="FAILED",
+                trigger_ota=False
+            )
+            return False
+
+    success = download_file(download_url, "main.py")
 
     if success:
         print(f"[+] Cập nhật thành công lên phiên bản v{target_version}! Đang khởi động lại...")

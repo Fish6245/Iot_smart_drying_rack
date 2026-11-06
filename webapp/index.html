@@ -42,7 +42,7 @@
         <div class="card">
           <h3>Xác thực Thời tiết Tại chỗ</h3>
           <div class="status-row">
-            <span>Trạng thái thời tiết (A0):</span>
+            <span>Trạng thái thời tiết (A2):</span>
             <strong id="rain-status-badge" class="tag tag-safe">Không mưa</strong>
           </div>
           <div class="status-row">
@@ -70,7 +70,7 @@
       <h2 class="section-title">Giá trị Cảm biến Thời gian thực</h2>
       <div class="grid-4">
         <div class="card sensor-card">
-          <span class="sensor-label">Cảm biến nước A0 (ADS1115)</span>
+          <span class="sensor-label">Cảm biến nước A2 (ADS1115)</span>
           <div class="sensor-value" id="val-water-a0">0</div>
           <small id="sub-water-a0">ADC 16-bit (Độ ướt: 0%)</small>
         </div>
@@ -125,7 +125,7 @@
           </div>
         </div>
         <div class="card chart-container">
-          <h3>Biểu đồ Cảm biến Nước A0 & Quang trở LDR A1 (ADC)</h3>
+          <h3>Biểu đồ Cảm biến Nước A2 & Quang trở LDR A1 (ADC)</h3>
           <div class="chart-wrapper">
             <canvas id="adcChart"></canvas>
           </div>
@@ -165,7 +165,7 @@
         <div class="setting-item priority-box">
           <div>
             <h4>🌧️ Chế độ ưu tiên thu sào khi phát hiện mưa</h4>
-            <p>Tự động thu sào ngay lập tức khi cảm biến A0 phát hiện mưa, <strong>kể cả khi đang trong lịch
+            <p>Tự động thu sào ngay lập tức khi cảm biến nước A2 phát hiện mưa, <strong>kể cả khi đang trong lịch
                 phơi</strong>.</p>
           </div>
           <label class="switch">
@@ -179,12 +179,12 @@
         <h3>Hiệu chuẩn Ngưỡng Cảm biến (ADS1115 & DHT11)</h3>
         <div class="setting-row-thresh">
           <div class="time-box">
-            <label for="input-rain-thresh">Ngưỡng phát hiện mưa A0 (ADC thấp hơn = Mưa):</label>
-            <input type="number" id="input-rain-thresh" value="15000" min="0" max="32767">
+            <label for="input-rain-thresh">Ngưỡng phát hiện mưa A2 (ADC cao hơn = Mưa):</label>
+            <input type="number" id="input-rain-thresh" value="2000" min="0" max="32767">
           </div>
           <div class="time-box">
-            <label for="input-sun-thresh">Ngưỡng xác thực trời nắng LDR A1 (ADC cao hơn = Nắng):</label>
-            <input type="number" id="input-sun-thresh" value="16000" min="0" max="32767">
+            <label for="input-sun-thresh">Ngưỡng phát hiện ánh sáng LDR A1 (ADC cao hơn = Có ánh sáng):</label>
+            <input type="number" id="input-sun-thresh" value="2000" min="0" max="32767">
           </div>
           <div class="time-box">
             <label for="input-hum-thresh">Ngưỡng xác thực độ ẩm DHT11 (% - cao hơn = Quá ẩm):</label>
@@ -336,11 +336,11 @@
         <!-- Rain Sensor A0 -->
         <div class="sim-slider-box">
           <div class="sim-slider-header">
-            <span>🌧️ Nước A0 (ADS1115):</span>
-            <strong id="sim-val-rain">25000</strong>
+2            <span>🌧️ Nước A2 (ADS1115):</span>
+            <strong id="sim-val-rain">100</strong>
             <small id="sim-sub-rain">(Khô ráo)</small>
           </div>
-          <input type="range" id="sim-slider-rain" min="2000" max="26400" step="200" value="25000">
+          <input type="range" id="sim-slider-rain" min="0" max="5000" step="10" value="100">
         </div>
 
         <!-- LDR A1 -->
@@ -350,7 +350,7 @@
             <strong id="sim-val-ldr">22000</strong>
             <small id="sim-sub-ldr">(Nắng)</small>
           </div>
-          <input type="range" id="sim-slider-ldr" min="1000" max="26400" step="200" value="22000">
+          <input type="range" id="sim-slider-ldr" min="0" max="10000" step="50" value="3000">
         </div>
 
         <!-- Temperature -->

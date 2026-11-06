@@ -47,7 +47,8 @@ if button_pin.value() == 0:
 # 2. KẾT NỐI WIFI VÀ TỰ ĐỘNG BẬT CAPTIVE PORTAL NẾU CHƯA CÓ MẠNG
 # ------------------------------------------------------------------------------
 def connect_wifi():
-    """Kết nối vào mạng WiFi theo cấu hình trong .env / config.py"""
+    """Kết nối vào mạng WiFi theo cấu hình trong config.ini / .env / config.py"""
+    gc.collect()
     sta_if = network.WLAN(network.STA_IF)
     ap_if = network.WLAN(network.AP_IF)
 
@@ -56,16 +57,16 @@ def connect_wifi():
 
     ssid = config.WIFI_SSID
     password = config.WIFI_PASSWORD
-
-    # Kiểm tra xem đã có cấu hình WiFi hợp lệ hay chưa
     has_valid_ssid = bool(ssid and ssid != "YOUR_WIFI_SSID")
 
     if has_valid_ssid:
         print(f"[*] Đang kết nối WiFi: {ssid}...")
         sta_if.active(True)
+        sta_if.disconnect()
+        time.sleep(1)
         sta_if.connect(ssid, password)
 
-        timeout = 12  # Chờ tối đa 12 giây
+        timeout = 20
         while not sta_if.isconnected() and timeout > 0:
             time.sleep(1)
             timeout -= 1
@@ -89,7 +90,8 @@ def connect_wifi():
         if not has_valid_ssid:
             print("[!] Chưa có cấu hình WiFi (hoặc đang để mặc định)!")
         else:
-            print("[!] Không thể kết nối tới WiFi đã lưu (sai mật khẩu hoặc ngoài vùng phủ sóng)!")
+            print("[!] Không thể kết nối WiFi. Mã trạng thái:", sta_if.status())
+            print("[!] (Sai mật khẩu hoặc ngoài vùng phủ sóng)!")
         print("[*] TỰ ĐỘNG KHỞI CHẠY WIFI CAPTIVE PORTAL: 'SaoPhoi-Setup'...")
         print("!" * 55 + "\n")
 
