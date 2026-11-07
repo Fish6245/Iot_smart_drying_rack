@@ -94,7 +94,7 @@ PIN_I2C_SCL = 5   # D1 (GPIO 5) -> SCL ADS1115
 PIN_I2C_SDA = 4   # D2 (GPIO 4) -> SDA ADS1115
 PIN_DHT11   = 2   # D4 (GPIO 2) -> DATA DHT11
 PIN_DHT22   = PIN_DHT11 # Alias tương thích ngược
-PIN_BUTTON  = 12  # D6 (GPIO 12) -> Nút nhấn SW1 (External Pull-up 10k)
+PIN_BUTTON  = 12  # D6 (GPIO 12) -> SW1, Active HIGH (External Pull-down 10k)
 PIN_SERVO   = 13  # D7 (GPIO 13) -> PWM Động cơ Servo SG90
 
 # Kênh trên module ADS1115 (0x48)
@@ -115,4 +115,3 @@ LOOP_INTERVAL_SEC = 2.0
 
 del _env
 del _load_env
-

@@ -17,11 +17,11 @@ gc.enable()
 # - Nhấn giữ > 3 giây khi cắm nguồn: CƯỠNG BỨC MỞ WIFI CAPTIVE PORTAL (SaoPhoi-Setup)
 # - Nhấn nhả (< 3 giây) khi cắm nguồn: CHẾ ĐỘ SAFE BOOT (Dừng code để nạp qua USB)
 button_pin = machine.Pin(config.PIN_BUTTON, machine.Pin.IN)
-if button_pin.value() == 0:
+if button_pin.value() == 1:
     t_press = time.ticks_ms()
     is_long = False
     print("[*] Phát hiện nút SW1 được bấm khi cấp nguồn...")
-    while button_pin.value() == 0:
+    while button_pin.value() == 1:
         time.sleep_ms(50)
         if time.ticks_diff(time.ticks_ms(), t_press) >= 3000:
             is_long = True
