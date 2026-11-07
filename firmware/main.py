@@ -22,7 +22,9 @@ for _part in (
     gc.collect()
 del _part, _source
 
-import urequests
+if firebase_enabled:
+    import urequests
+
 sync_ntp_time()
 if config.CHECK_GITHUB_OTA_ON_BOOT:
     try:

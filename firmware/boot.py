@@ -36,6 +36,11 @@ if button_pin.value() == 1:
             wifi_manager.start_portal(timeout_sec=300)
         except Exception as e:
             print("[!] Lỗi WiFi Manager:", e)
+        finally:
+            sys.modules.pop("wifi_manager", None)
+            if "wifi_manager" in globals():
+                del wifi_manager
+            gc.collect()
     else:
         print("\n" + "!" * 55)
         print("[!] SAFE BOOT MODE ĐƯỢC KÍCH HOẠT!")
@@ -101,6 +106,11 @@ def connect_wifi():
             wifi_manager.start_portal(timeout_sec=180)
         except Exception as e:
             print("[!] Không thể chạy WiFi Manager:", e)
+        finally:
+            sys.modules.pop("wifi_manager", None)
+            if "wifi_manager" in locals():
+                del wifi_manager
+            gc.collect()
 
         print("[*] Tiếp tục khởi chạy chế độ Offline (Cảm biến hoạt động độc lập).")
         return False
