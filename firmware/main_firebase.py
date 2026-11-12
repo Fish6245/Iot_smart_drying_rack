@@ -13,7 +13,10 @@ def restore_sun_stats(today):
         return True
 
     res = None
+    data = None
     try:
+        gc.collect()
+        print("[Firebase] RAM trống trước khi khôi phục:", gc.mem_free(), "bytes")
         res = urequests.get(build_fb_url("telemetry"))
         if res.status_code != 200:
             print("[!] Firebase trả về HTTP", res.status_code, "khi khôi phục thống kê")
@@ -36,12 +39,15 @@ def restore_sun_stats(today):
     finally:
         if res:
             res.close()
+        res = None
+        data = None
         gc.collect()
 
 def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
     """Đẩy telemetry thời gian thực lên Firebase"""
     if not firebase_enabled:
         return
+    gc.collect()
     url = build_fb_url("telemetry")
     payload = {
         "temperature": round(temp, 1),
@@ -66,12 +72,16 @@ def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
     finally:
         if res:
             res.close()
+        res = None
+        payload = None
+        url = None
         gc.collect()
 
 def push_history_record(temp, hum, water_a2, ldr_a1, timestamp):
     """Đẩy bản ghi lịch sử định kỳ lên /smart_clothesline/history/<timestamp>"""
     if not firebase_enabled:
         return
+    gc.collect()
     url = build_fb_url(f"history/{int(timestamp)}")
     payload = {
         "temp": round(temp, 1),
@@ -87,6 +97,9 @@ def push_history_record(temp, hum, water_a2, ldr_a1, timestamp):
     finally:
         if res:
             res.close()
+        res = None
+        payload = None
+        url = None
         gc.collect()
 
 def fetch_firebase_section(section):
@@ -108,6 +121,7 @@ def fetch_firebase_section(section):
     finally:
         if res:
             res.close()
+        res = None
         gc.collect()
     return data
 
@@ -115,15 +129,20 @@ def update_firebase_maintenance_flag(key, val):
     """Cập nhật cờ bảo trì trên Firebase"""
     if not firebase_enabled:
         return
+    gc.collect()
     url = build_fb_url("maintenance")
+    payload = {key: val}
     res = None
     try:
-        res = urequests.patch(url, json={key: val})
+        res = urequests.patch(url, json=payload)
     except Exception as e:
         pass
     finally:
         if res:
             res.close()
+        res = None
+        payload = None
+        url = None
         gc.collect()
 
 # ------------------------------------------------------------------------------

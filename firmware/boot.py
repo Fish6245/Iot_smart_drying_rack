@@ -82,13 +82,13 @@ def connect_wifi():
         print("[+] Kết nối WiFi thành công!")
         print("[+] Địa chỉ IP thiết bị:", sta_if.ifconfig()[0])
 
-        # Kích hoạt WebREPL nội bộ (nếu có cấu hình)
-        try:
-            import webrepl
-            webrepl.start()
-            print("[+] WebREPL đã sẵn sàng cho cập nhật không dây nội bộ.")
-        except Exception:
-            pass
+        if config.ENABLE_WEBREPL:
+            try:
+                import webrepl
+                webrepl.start()
+                print("[+] WebREPL đã sẵn sàng cho cập nhật không dây nội bộ.")
+            except Exception as e:
+                print("[!] Không thể khởi động WebREPL:", e)
         return True
     else:
         print("\n" + "!" * 55)

@@ -58,11 +58,14 @@ def handle_button():
 
     if firebase_enabled:
         try:
+            gc.collect()
             res_m = urequests.patch(build_fb_url("control"), json={
                 "manual_command": manual_command,
                 "servo_angle": system_state["servo_angle"]
             })
             res_m.close()
+            res_m = None
+            gc.collect()
         except Exception as e:
             print("[!] Lỗi gửi lệnh nút SW1 lên Firebase:", e)
 

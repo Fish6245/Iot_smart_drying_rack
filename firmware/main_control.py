@@ -35,9 +35,12 @@ def apply_target_state(current_time_str, is_raining, is_humid):
 
         if firebase_enabled:
             try:
-                res_u = urequests.patch(build_fb_url("control"), {
+                gc.collect()
+                res_u = urequests.patch(build_fb_url("control"), json={
                     "servo_angle": system_state["servo_angle"]
                 })
                 res_u.close()
+                res_u = None
+                gc.collect()
             except:
                 pass
