@@ -160,6 +160,26 @@ body {
   flex-wrap: wrap;
 }
 
+.control-mode {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.control-mode-status {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.control-mode .btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
 .btn {
   padding: 10px 16px;
   border: none;

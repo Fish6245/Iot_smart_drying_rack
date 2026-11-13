@@ -13,6 +13,7 @@ let currentConfig = loadUserConfig();
 let db = null;
 let firebaseApp = null;
 let historyUnsubscribe = null;
+let currentControlMode = "AUTO";
 
 const WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast?latitude=10.8231&longitude=106.6297&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&timezone=Asia%2FBangkok";
 
@@ -253,6 +254,44 @@ export function updateClotheslineUI(state) {
   }
 }
 
+function updateControlModeUI(mode) {
+  currentControlMode = mode === "MANUAL" ? "MANUAL" : "AUTO";
+  const isAuto = currentControlMode === "AUTO";
+  const status = document.getElementById('control-mode-status');
+  const btnAuto = document.getElementById('btn-auto-mode');
+  const btnManual = document.getElementById('btn-manual-mode');
+
+  if (status) status.innerText = `Chế độ hiện tại: ${isAuto ? "Tự động" : "Thủ công"}`;
+  if (btnAuto) {
+    btnAuto.classList.toggle('active', isAuto);
+    btnAuto.setAttribute('aria-pressed', String(isAuto));
+  }
+  if (btnManual) {
+    btnManual.classList.toggle('active', !isAuto);
+    btnManual.setAttribute('aria-pressed', String(!isAuto));
+  }
+}
+
+function setControlMode(mode, manualCommand = "NONE") {
+  updateControlModeUI(mode);
+  if (db) {
+    update(ref(db, 'smart_clothesline/control'), {
+      mode: currentControlMode,
+      manual_command: manualCommand
+    }).catch(err => console.error("Lỗi cập nhật chế độ điều khiển:", err));
+  }
+}
+
+document.getElementById('btn-auto-mode')?.addEventListener('click', () => {
+  setControlMode("AUTO");
+});
+
+document.getElementById('btn-manual-mode')?.addEventListener('click', () => {
+  setControlMode("MANUAL");
+});
+
+updateControlModeUI(currentControlMode);
+
 // ==================== LẮNG NGHE DỮ LIỆU FIREBASE ====================
 function setupFirebaseListeners() {
   if (!db) return;
@@ -303,11 +342,14 @@ function setupFirebaseListeners() {
     if (rainThresh && c.rain_threshold !== undefined) rainThresh.value = c.rain_threshold;
     if (sunThresh && c.sun_threshold !== undefined) sunThresh.value = c.sun_threshold;
     if (humThresh && c.humidity_threshold !== undefined) humThresh.value = c.humidity_threshold;
+    if (c.mode === "AUTO" || c.mode === "MANUAL") {
+      updateControlModeUI(c.mode);
+    }
 
     // Lắng nghe lệnh điều khiển từ Firebase và cập nhật ngay lên GUI
-    if (c.manual_command === "OPEN") {
+    if (currentControlMode === "MANUAL" && c.manual_command === "OPEN") {
       updateClotheslineUI("OPEN");
-    } else if (c.manual_command === "CLOSE") {
+    } else if (currentControlMode === "MANUAL" && c.manual_command === "CLOSE") {
       updateClotheslineUI("CLOSED");
     }
   });
@@ -317,10 +359,12 @@ function setupFirebaseListeners() {
 document.getElementById('btn-open-pole')?.addEventListener('click', () => {
   // Cập nhật GUI tức thì (Optimistic UI)
   updateClotheslineUI("OPEN");
+  updateControlModeUI("MANUAL");
 
   if (db) {
     // 1. Cập nhật nhánh Control để gửi lệnh đến MCU
     update(ref(db, 'smart_clothesline/control'), { 
+      mode: "MANUAL",
       manual_command: "OPEN", 
       servo_angle: 90 
     }).catch(err => console.error("Lỗi gửi lệnh Mở sào:", err));
@@ -336,10 +380,12 @@ document.getElementById('btn-open-pole')?.addEventListener('click', () => {
 document.getElementById('btn-close-pole')?.addEventListener('click', () => {
   // Cập nhật GUI tức thì (Optimistic UI)
   updateClotheslineUI("CLOSED");
+  updateControlModeUI("MANUAL");
 
   if (db) {
     // 1. Cập nhật nhánh Control để gửi lệnh đến MCU
     update(ref(db, 'smart_clothesline/control'), { 
+      mode: "MANUAL",
       manual_command: "CLOSE", 
       servo_angle: 0 
     }).catch(err => console.error("Lỗi gửi lệnh Thu sào:", err));
@@ -443,6 +489,24 @@ function populateConfigUI() {
 }
 
 populateConfigUI();
+
+document.getElementById('toggle-rain-priority')?.addEventListener('change', async (event) => {
+  if (!db) return;
+
+  const toast = document.getElementById('save-toast');
+  try {
+    await update(ref(db, 'smart_clothesline/schedule'), {
+      rain_priority_override: event.target.checked
+    });
+    if (toast) {
+      toast.innerText = "✓ Đã cập nhật ưu tiên mưa/độ ẩm";
+      setTimeout(() => { toast.innerText = ""; }, 3000);
+    }
+  } catch (err) {
+    console.error("Lỗi cập nhật ưu tiên mưa/độ ẩm:", err);
+    if (toast) toast.innerText = "Không thể cập nhật ưu tiên mưa/độ ẩm";
+  }
+});
 
 document.getElementById('btn-save-settings')?.addEventListener('click', async () => {
   const autoSchedule = document.getElementById('toggle-auto-schedule')?.checked;
@@ -607,15 +671,32 @@ function applySimulatedData() {
   const isRaining = rain > rainThresh;
   const isSunny = ldr > sunThresh;
   const isHumid = hum > humThresh;
+  const autoScheduleEnabled = document.getElementById('toggle-auto-schedule')?.checked;
 
-  // Xác định trạng thái sào theo quy tắc ưu tiên: Mưa hoặc Quá ẩm sẽ thu sào
-  let clotheslineState = "OPEN";
-  if (rainPriority && (isRaining || isHumid)) {
+  let inSchedule = false;
+  if (autoScheduleEnabled) {
+    const openTime = document.getElementById('input-open-time')?.value || "07:00";
+    const closeTime = document.getElementById('input-close-time')?.value || "18:00";
+    const currentTime = new Date().toLocaleTimeString('en-GB', {
+      timeZone: 'Asia/Bangkok',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    inSchedule = openTime <= closeTime
+      ? openTime <= currentTime && currentTime < closeTime
+      : currentTime >= openTime || currentTime < closeTime;
+  }
+
+  let clotheslineState;
+  if (autoScheduleEnabled) {
+    clotheslineState = !inSchedule || (rainPriority && (isRaining || isHumid))
+      ? "CLOSED"
+      : "OPEN";
+  } else if ((rainPriority || !autoScheduleEnabled) && (isRaining || isHumid)) {
     clotheslineState = "CLOSED";
-  } else if (!isRaining && isSunny && !isHumid) {
-    clotheslineState = "OPEN";
   } else {
-    clotheslineState = "CLOSED";
+    clotheslineState = isSunny && !isRaining && !isHumid ? "OPEN" : "CLOSED";
   }
 
   const simulatedPayload = {

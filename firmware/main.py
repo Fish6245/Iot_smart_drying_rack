@@ -24,6 +24,7 @@ del _part, _source
 
 if firebase_enabled:
     import urequests
+    reset_control_mode_on_boot()
 
 sync_ntp_time()
 if config.CHECK_GITHUB_OTA_ON_BOOT:

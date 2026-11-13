@@ -1,398 +1,589 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Clothesline IoT Dashboard</title>
+    <link rel="stylesheet" href="style.css" />
+    <!-- Thư viện Chart.js phục vụ Trang 2 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
 
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Clothesline IoT Dashboard</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Thư viện Chart.js phục vụ Trang 2 -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-
-<body>
-  <header class="app-header">
-    <div class="brand">
-      <h1>🌤️ Hệ Thống Sào Phơi Thông Minh</h1>
-      <span id="device-status" class="badge offline">Đang kết nối...</span>
-    </div>
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-target="tab-overview">1. Trang tổng quan</button>
-      <button class="tab-btn" data-target="tab-charts">2. Biểu đồ & Lịch sử</button>
-      <button class="tab-btn" data-target="tab-settings">3. Cài đặt & Hẹn giờ</button>
-      <button class="tab-btn" data-target="tab-maintenance">4. Bảo trì</button>
-    </nav>
-  </header>
-
-  <main class="container">
-    <!-- ==================== TRANG 1: TỔNG QUAN ==================== -->
-    <section id="tab-overview" class="tab-content active">
-      <div class="grid-3">
-        <!-- Trạng thái Sào phơi & Điều khiển thủ công -->
-        <div class="card highlight-card">
-          <h3>Trạng thái Sào phơi (SG90 - D7)</h3>
-          <div class="state-display" id="clothesline-state-text">ĐANG MỞ</div>
-          <div class="btn-group">
-            <button id="btn-open-pole" class="btn btn-primary">Mở sào (Phơi đồ)</button>
-            <button id="btn-close-pole" class="btn btn-warning">Thu sào (Cất đồ)</button>
-          </div>
-        </div>
-
-        <!-- Trạng thái Thời tiết tại chỗ -->
-        <div class="card">
-          <h3>Xác thực Thời tiết Tại chỗ</h3>
-          <div class="status-row">
-            <span>Trạng thái thời tiết (A2):</span>
-            <strong id="rain-status-badge" class="tag tag-safe">Không mưa</strong>
-          </div>
-          <div class="status-row">
-            <span>Quang trở LDR (A1):</span>
-            <strong id="sun-status-badge" class="tag tag-sun">Có nắng</strong>
-          </div>
-          <div class="status-row">
-            <span>Xác thực độ ẩm (DHT11):</span>
-            <strong id="hum-status-badge" class="tag tag-safe">Đạt chuẩn (Khô ráo)</strong>
-          </div>
-        </div>
-
-        <!-- Dự báo từ API Thời tiết -->
-        <div class="card weather-api-card">
-          <h3>🌐 API Thời tiết Khu vực</h3>
-          <div id="api-weather-content">
-            <p class="weather-temp" id="api-temp">-- °C</p>
-            <p id="api-desc">Đang tải dữ liệu...</p>
-            <small id="api-wind">Gió: -- km/h | Độ ẩm khu vực: --%</small>
-          </div>
-        </div>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <h1>🌤️ Hệ Thống Sào Phơi Thông Minh</h1>
+        <!-- <span id="device-status" class="badge offline">Đang kết nối...</span> -->
       </div>
-
-      <!-- Hàng 2: Thông số cảm biến Realtime -->
-      <h2 class="section-title">Giá trị Cảm biến Thời gian thực</h2>
-      <div class="grid-4">
-        <div class="card sensor-card">
-          <span class="sensor-label">Cảm biến nước A2 (ADS1115)</span>
-          <div class="sensor-value" id="val-water-a0">0</div>
-          <small id="sub-water-a0">ADC 16-bit (Độ ướt: 0%)</small>
-        </div>
-
-        <div class="card sensor-card">
-          <span class="sensor-label">Quang trở LDR A1 (ADS1115)</span>
-          <div class="sensor-value" id="val-ldr-a1">0</div>
-          <small id="sub-ldr-a1">ADC 16-bit (Cường độ: 0%)</small>
-        </div>
-
-        <div class="card sensor-card">
-          <span class="sensor-label">Nhiệt độ môi trường (DHT11)</span>
-          <div class="sensor-value" id="val-temp">-- °C</div>
-          <small>Chân D4 (GPIO 2)</small>
-        </div>
-
-        <div class="card sensor-card">
-          <span class="sensor-label">Độ ẩm không khí (DHT11)</span>
-          <div class="sensor-value" id="val-hum">-- %</div>
-          <small>Chân D4 (GPIO 2)</small>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TRANG 2: BIỂU ĐỒ & LỊCH SỬ ==================== -->
-    <section id="tab-charts" class="tab-content">
-      <div class="grid-3">
-        <div class="card stat-card">
-          <h3>☀️ Thống kê thời gian phơi trong ngày</h3>
-          <div class="big-stat" id="stat-drying-time">0 giờ 0 phút</div>
-          <p>Tổng thời gian sào ở trạng thái MỞ trong hôm nay</p>
-        </div>
-
-        <div class="card stat-card" style="grid-column: span 2;">
-          <h3>Khung thời gian hiển thị biểu đồ</h3>
-          <div class="filter-group">
-            <label for="chart-limit">Lựa chọn khung dữ liệu lịch sử:</label>
-            <select id="chart-limit">
-              <option value="12">12 mốc gần nhất (~1 giờ)</option>
-              <option value="36" selected>36 mốc gần nhất (~3 giờ)</option>
-              <option value="72">72 mốc gần nhất (~6 giờ)</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid-2">
-        <div class="card chart-container">
-          <h3>Biểu đồ Nhiệt độ (°C) & Độ ẩm (%) - DHT11</h3>
-          <div class="chart-wrapper">
-            <canvas id="dhtChart"></canvas>
-          </div>
-        </div>
-        <div class="card chart-container">
-          <h3>Biểu đồ Cảm biến Nước A2 & Quang trở LDR A1 (ADC)</h3>
-          <div class="chart-wrapper">
-            <canvas id="adcChart"></canvas>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TRANG 3: CÀI ĐẶT & HẸN GIỜ ==================== -->
-    <section id="tab-settings" class="tab-content">
-      <div class="card settings-card">
-        <h2>⏰ Cài đặt Lịch trình & Ưu tiên Thời tiết</h2>
-
-        <div class="setting-item">
-          <div>
-            <h4>Bật/Tắt lịch tự động</h4>
-            <p>Tự động mở sào và thu sào theo khung giờ cố định hàng ngày</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="toggle-auto-schedule">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <div class="setting-row-time">
-          <div class="time-box">
-            <label for="input-open-time">Cài giờ mở sào (Ví dụ 07:00):</label>
-            <input type="time" id="input-open-time" value="07:00">
-          </div>
-          <div class="time-box">
-            <label for="input-close-time">Cài giờ thu sào (Ví dụ 18:00):</label>
-            <input type="time" id="input-close-time" value="18:00">
-          </div>
-        </div>
-
-        <hr>
-
-        <div class="setting-item priority-box">
-          <div>
-            <h4>🌧️ Chế độ ưu tiên thu sào khi phát hiện mưa</h4>
-            <p>Tự động thu sào ngay lập tức khi cảm biến nước A2 phát hiện mưa, <strong>kể cả khi đang trong lịch
-                phơi</strong>.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="toggle-rain-priority" checked>
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <hr>
-
-        <h3>Hiệu chuẩn Ngưỡng Cảm biến (ADS1115 & DHT11)</h3>
-        <div class="setting-row-thresh">
-          <div class="time-box">
-            <label for="input-rain-thresh">Ngưỡng phát hiện mưa A2 (ADC cao hơn = Mưa):</label>
-            <input type="number" id="input-rain-thresh" value="2000" min="0" max="32767">
-          </div>
-          <div class="time-box">
-            <label for="input-sun-thresh">Ngưỡng phát hiện ánh sáng LDR A1 (ADC cao hơn = Có ánh sáng):</label>
-            <input type="number" id="input-sun-thresh" value="2000" min="0" max="32767">
-          </div>
-          <div class="time-box">
-            <label for="input-hum-thresh">Ngưỡng xác thực độ ẩm DHT11 (% - cao hơn = Quá ẩm):</label>
-            <input type="number" id="input-hum-thresh" value="80" min="0" max="100" step="1">
-          </div>
-        </div>
-
-        <hr>
-
-        <h3>🔗 Cấu hình Kết nối Firebase & GitHub</h3>
-        <div class="form-group-settings">
-          <label for="input-cfg-db-url">Firebase Database URL:</label>
-          <input type="text" id="input-cfg-db-url" placeholder="https://your-project-id-default-rtdb.firebaseio.com">
-        </div>
-        <div class="setting-row-time">
-          <div class="time-box">
-            <label for="input-cfg-api-key">Firebase API Key (tùy chọn):</label>
-            <input type="text" id="input-cfg-api-key" placeholder="AIzaSy...">
-          </div>
-          <div class="time-box">
-            <label for="input-cfg-project-id">Firebase Project ID:</label>
-            <input type="text" id="input-cfg-project-id" placeholder="your-project-id">
-          </div>
-        </div>
-        <div class="setting-row-time">
-          <div class="time-box">
-            <label for="input-cfg-gh-user">GitHub User / Owner:</label>
-            <input type="text" id="input-cfg-gh-user" placeholder="chuvitvang">
-          </div>
-          <div class="time-box">
-            <label for="input-cfg-gh-repo">GitHub Repository:</label>
-            <input type="text" id="input-cfg-gh-repo" placeholder="Iot_smart_drying_rack">
-          </div>
-        </div>
-
-        <div class="save-actions">
-          <button id="btn-save-settings" class="btn btn-primary">Lưu Cài đặt</button>
-          <span id="save-toast" class="toast-msg"></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ==================== TRANG 4: BẢO TRÌ ==================== -->
-    <section id="tab-maintenance" class="tab-content">
-      <div class="card maint-page-card">
-        <div class="maint-page-header">
-          <h2>🛠️ Cơ chế Bảo trì & Cập nhật Firmware</h2>
-          <p class="section-desc">Quản lý phiên bản vi điều khiển WeMos D1 R2 (ESP8266), cập nhật mã nguồn OTA từ xa qua GitHub và kích hoạt khởi động lại thiết bị an toàn.</p>
-        </div>
-
-        <div class="maint-grid-boxes">
-          <!-- Hộp thông tin phiên bản -->
-          <div class="maint-card-sub">
-            <h3>📦 Thông tin Phiên bản Hệ thống</h3>
-            <div class="status-row">
-              <span>Phiên bản Firmware trên mạch:</span>
-              <strong id="curr-fw-ver" class="badge online">v2.0.0</strong>
-            </div>
-            <div class="status-row">
-              <span>Phiên bản mới nhất trên GitHub:</span>
-              <strong id="git-fw-ver" class="badge">Chưa kiểm tra</strong>
-            </div>
-            <div class="status-row">
-              <span>Trạng thái tiến trình OTA:</span>
-              <strong id="ota-status-text" class="badge">IDLE</strong>
-            </div>
-          </div>
-
-          <!-- Hộp thao tác OTA & Reset -->
-          <div class="maint-card-sub">
-            <h3>⚡ Thao tác Bảo trì từ xa</h3>
-            <div class="maint-actions-vertical">
-              <button id="btn-check-ota" class="btn btn-outline" style="width: 100%;">
-                🔍 Kiểm tra bản cập nhật GitHub
-              </button>
-              <button id="btn-update-ota" class="btn btn-success" style="width: 100%;" disabled>
-                🚀 Update Firmware (OTA)
-              </button>
-              <button id="btn-reset-mcu" class="btn btn-danger" style="width: 100%;">
-                🔄 Reset thiết bị từ xa
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Hướng dẫn và quy trình kỹ thuật -->
-        <div class="maint-guide">
-          <h3>📖 Quy trình & Hướng dẫn Kỹ thuật</h3>
-          <ul>
-            <li><strong>Cổng Cấu hình WiFi Thông minh (Captive Portal):</strong> Khi mạch chưa có WiFi hoặc đổi nhà/đổi mật khẩu, mạch tự phát WiFi <code>SaoPhoi-Setup</code> (IP: <code>192.168.4.1</code>). Kết nối điện thoại vào mạng này, trang cài đặt sẽ tự động bật lên để chọn WiFi và lưu mật khẩu mà không cần cắm máy tính.</li>
-            <li><strong>Đổi WiFi chủ động:</strong> Nhấn giữ nút nhấn SW1 (GPIO 12) trên 3 giây trong khi cắm nguồn để cưỡng bức mở Cổng cấu hình WiFi bất kỳ lúc nào.</li>
-            <li><strong>Cập nhật OTA 100% Không dây (Zero Hardware Touch):</strong> Hoàn toàn không cần chạm vào nút bấm phần cứng. Bạn chỉ cần nhấn <em>"Kiểm tra bản cập nhật"</em> rồi bấm <em>"Update Firmware (OTA)"</em> trên Web. Vi điều khiển ESP8266 sẽ tự động nhận lệnh qua Firebase, tải mã nguồn mới từ GitHub và tự khởi động lại.</li>
-            <li><strong>Tự động kiểm tra khi cấp nguồn:</strong> Mỗi lần mạch khởi động lại, hệ thống sẽ tự đối chiếu file <code>version.json</code> trên GitHub để tự động đồng bộ bản mới nhất.</li>
-            <li><strong>Khởi động lại từ xa (Soft Reset):</strong> Gửi cờ <code>trigger_reset = true</code> qua Firebase để khởi động lại mạch an toàn mà không cần rút nguồn điện vật lý.</li>
-          </ul>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <!-- ==================== DEV SIMULATOR BAR ==================== -->
-  <aside id="dev-sim-bar" class="dev-sim-bar collapsed">
-    <!-- Header / Toggle Strip -->
-    <div class="sim-header" id="sim-header-toggle">
-      <div class="sim-title">
-        <span class="sim-icon">🛠️</span>
-        <strong>Dev Simulator Bar</strong>
-        <span class="badge badge-sim" id="sim-mode-badge">LOCAL MOCK</span>
-        <span class="sim-subtext">Kiểm thử cảm biến & kịch bản thời tiết</span>
-      </div>
-      <div class="sim-header-actions">
-        <button id="btn-toggle-sim-collapse" class="btn btn-sm btn-outline-light">
-          <span id="sim-collapse-icon">▲</span> <span id="sim-collapse-text">Mở Simulator</span>
+      <nav class="tab-nav">
+        <button class="tab-btn active" data-target="tab-overview">
+          1. Trang tổng quan
         </button>
-      </div>
-    </div>
+        <button class="tab-btn" data-target="tab-charts">
+          2. Biểu đồ & Lịch sử
+        </button>
+        <button class="tab-btn" data-target="tab-settings">
+          3. Cài đặt & Hẹn giờ
+        </button>
+        <button class="tab-btn" data-target="tab-maintenance">
+          4. Bảo trì
+        </button>
+      </nav>
+    </header>
 
-    <!-- Simulator Body (Collapsible) -->
-    <div class="sim-body" id="sim-body">
-      <!-- Row 1: Scenarios & Mode -->
-      <div class="sim-row">
-        <div class="sim-col">
-          <label class="sim-label">🎯 Kịch bản nhanh (Quick Scenarios):</label>
-          <div class="sim-btn-group">
-            <button class="btn btn-sm sim-scenario-btn" data-scenario="sunny">☀️ Nắng to (Phơi đồ)</button>
-            <button class="btn btn-sm sim-scenario-btn" data-scenario="rainy">🌧️ Đổ mưa (Thu sào)</button>
-            <button class="btn btn-sm sim-scenario-btn" data-scenario="cloudy">🌥️ Râm mát / Tối</button>
-            <button class="btn btn-sm sim-scenario-btn" data-scenario="night">🌙 Đêm khuya</button>
+    <main class="container">
+      <!-- ==================== TRANG 1: TỔNG QUAN ==================== -->
+      <section id="tab-overview" class="tab-content active">
+        <div class="grid-3">
+          <!-- Trạng thái Sào phơi & Điều khiển thủ công -->
+          <div class="card highlight-card">
+            <h3>Trạng thái Sào phơi (SG90 - D7)</h3>
+            <div class="state-display" id="clothesline-state-text">ĐANG MỞ</div>
+            <div class="btn-group">
+              <button id="btn-open-pole" class="btn btn-primary">
+                Mở sào (Phơi đồ)
+              </button>
+              <button id="btn-close-pole" class="btn btn-warning">
+                Thu sào (Cất đồ)
+              </button>
+            </div>
+            <div class="control-mode">
+              <span id="control-mode-status" class="control-mode-status"
+                >Chế độ hiện tại: Tự động</span
+              >
+              <div class="btn-group">
+                <button id="btn-auto-mode" class="btn btn-sm btn-outline">
+                  Tự động
+                </button>
+                <button id="btn-manual-mode" class="btn btn-sm btn-outline">
+                  Thủ công
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trạng thái Thời tiết tại chỗ -->
+          <div class="card">
+            <h3>Xác thực Thời tiết Tại chỗ</h3>
+            <div class="status-row">
+              <span>Trạng thái thời tiết (A2):</span>
+              <strong id="rain-status-badge" class="tag tag-safe"
+                >Không mưa</strong
+              >
+            </div>
+            <div class="status-row">
+              <span>Quang trở LDR (A1):</span>
+              <strong id="sun-status-badge" class="tag tag-sun">Có nắng</strong>
+            </div>
+            <div class="status-row">
+              <span>Xác thực độ ẩm (DHT11):</span>
+              <strong id="hum-status-badge" class="tag tag-safe"
+                >Đạt chuẩn (Khô ráo)</strong
+              >
+            </div>
+          </div>
+
+          <!-- Dự báo từ API Thời tiết -->
+          <div class="card weather-api-card">
+            <h3>🌐 API Thời tiết Khu vực</h3>
+            <div id="api-weather-content">
+              <p class="weather-temp" id="api-temp">-- °C</p>
+              <p id="api-desc">Đang tải dữ liệu...</p>
+              <small id="api-wind">Gió: -- km/h | Độ ẩm khu vực: --%</small>
+            </div>
           </div>
         </div>
 
-        <div class="sim-col sim-col-mode">
-          <label class="sim-label">Chế độ kiểm thử:</label>
-          <div class="sim-mode-toggle">
-            <label class="radio-label">
-              <input type="radio" name="sim-target" value="local" checked id="sim-mode-local">
-              <span>Chỉ trên Web (Local)</span>
+        <!-- Hàng 2: Thông số cảm biến Realtime -->
+        <h2 class="section-title">Giá trị Cảm biến Thời gian thực</h2>
+        <div class="grid-4">
+          <div class="card sensor-card">
+            <span class="sensor-label">Cảm biến nước A2 (ADS1115)</span>
+            <div class="sensor-value" id="val-water-a0">0</div>
+            <small id="sub-water-a0">ADC 16-bit (Độ ướt: 0%)</small>
+          </div>
+
+          <div class="card sensor-card">
+            <span class="sensor-label">Quang trở LDR A1 (ADS1115)</span>
+            <div class="sensor-value" id="val-ldr-a1">0</div>
+            <small id="sub-ldr-a1">ADC 16-bit (Cường độ: 0%)</small>
+          </div>
+
+          <div class="card sensor-card">
+            <span class="sensor-label">Nhiệt độ môi trường (DHT11)</span>
+            <div class="sensor-value" id="val-temp">-- °C</div>
+            <small>Chân D4 (GPIO 2)</small>
+          </div>
+
+          <div class="card sensor-card">
+            <span class="sensor-label">Độ ẩm không khí (DHT11)</span>
+            <div class="sensor-value" id="val-hum">-- %</div>
+            <small>Chân D4 (GPIO 2)</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TRANG 2: BIỂU ĐỒ & LỊCH SỬ ==================== -->
+      <section id="tab-charts" class="tab-content">
+        <div class="grid-3">
+          <div class="card stat-card">
+            <h3>☀️ Thống kê thời gian phơi trong ngày</h3>
+            <div class="big-stat" id="stat-drying-time">0 giờ 0 phút</div>
+            <p>Tổng thời gian sào ở trạng thái MỞ trong hôm nay</p>
+          </div>
+
+          <div class="card stat-card" style="grid-column: span 2">
+            <h3>Khung thời gian hiển thị biểu đồ</h3>
+            <div class="filter-group">
+              <label for="chart-limit">Lựa chọn khung dữ liệu lịch sử:</label>
+              <select id="chart-limit">
+                <option value="12">12 mốc gần nhất (~1 giờ)</option>
+                <option value="36" selected>36 mốc gần nhất (~3 giờ)</option>
+                <option value="72">72 mốc gần nhất (~6 giờ)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card chart-container">
+            <h3>Biểu đồ Nhiệt độ (°C) & Độ ẩm (%) - DHT11</h3>
+            <div class="chart-wrapper">
+              <canvas id="dhtChart"></canvas>
+            </div>
+          </div>
+          <div class="card chart-container">
+            <h3>Biểu đồ Cảm biến Nước A2 & Quang trở LDR A1 (ADC)</h3>
+            <div class="chart-wrapper">
+              <canvas id="adcChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TRANG 3: CÀI ĐẶT & HẸN GIỜ ==================== -->
+      <section id="tab-settings" class="tab-content">
+        <div class="card settings-card">
+          <h2>⏰ Cài đặt Lịch trình & Ưu tiên Thời tiết</h2>
+
+          <div class="setting-item">
+            <div>
+              <h4>Bật/Tắt lịch tự động</h4>
+              <p>Tự động mở sào và thu sào theo khung giờ cố định hàng ngày</p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-auto-schedule" />
+              <span class="slider"></span>
             </label>
-            <label class="radio-label">
-              <input type="radio" name="sim-target" value="firebase" id="sim-mode-firebase">
-              <span>Ghi vào Firebase (Sync)</span>
+          </div>
+
+          <div class="setting-row-time">
+            <div class="time-box">
+              <label for="input-open-time">Cài giờ mở sào (Ví dụ 07:00):</label>
+              <input type="time" id="input-open-time" value="07:00" />
+            </div>
+            <div class="time-box">
+              <label for="input-close-time"
+                >Cài giờ thu sào (Ví dụ 18:00):</label
+              >
+              <input type="time" id="input-close-time" value="18:00" />
+            </div>
+          </div>
+
+          <hr />
+
+          <div class="setting-item priority-box">
+            <div>
+              <h4>🌧️ Chế độ ưu tiên thu sào khi phát hiện mưa</h4>
+              <p>
+                Khi bật, mưa hoặc độ ẩm cao sẽ thu sào kể cả trong lịch phơi.
+                Khi tắt, sào giữ mở suốt khung giờ phơi bất kể mưa hay độ ẩm;
+                ngoài khung giờ, sào thu theo lịch. Thay đổi được áp dụng ngay.
+              </p>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-rain-priority" checked />
+              <span class="slider"></span>
             </label>
           </div>
+
+          <hr />
+
+          <h3>Hiệu chuẩn Ngưỡng Cảm biến (ADS1115 & DHT11)</h3>
+          <div class="setting-row-thresh">
+            <div class="time-box">
+              <label for="input-rain-thresh"
+                >Ngưỡng phát hiện mưa A2 (ADC cao hơn = Mưa):</label
+              >
+              <input
+                type="number"
+                id="input-rain-thresh"
+                value="2000"
+                min="0"
+                max="32767"
+              />
+            </div>
+            <div class="time-box">
+              <label for="input-sun-thresh"
+                >Ngưỡng phát hiện ánh sáng LDR A1 (ADC cao hơn = Có ánh
+                sáng):</label
+              >
+              <input
+                type="number"
+                id="input-sun-thresh"
+                value="2000"
+                min="0"
+                max="32767"
+              />
+            </div>
+            <div class="time-box">
+              <label for="input-hum-thresh"
+                >Ngưỡng xác thực độ ẩm DHT11 (% - cao hơn = Quá ẩm):</label
+              >
+              <input
+                type="number"
+                id="input-hum-thresh"
+                value="80"
+                min="0"
+                max="100"
+                step="1"
+              />
+            </div>
+          </div>
+
+          <hr />
+
+          <h3>🔗 Cấu hình Kết nối Firebase & GitHub</h3>
+          <div class="form-group-settings">
+            <label for="input-cfg-db-url">Firebase Database URL:</label>
+            <input
+              type="text"
+              id="input-cfg-db-url"
+              placeholder="https://your-project-id-default-rtdb.firebaseio.com"
+            />
+          </div>
+          <div class="setting-row-time">
+            <div class="time-box">
+              <label for="input-cfg-api-key"
+                >Firebase API Key (tùy chọn):</label
+              >
+              <input
+                type="text"
+                id="input-cfg-api-key"
+                placeholder="AIzaSy..."
+              />
+            </div>
+            <div class="time-box">
+              <label for="input-cfg-project-id">Firebase Project ID:</label>
+              <input
+                type="text"
+                id="input-cfg-project-id"
+                placeholder="your-project-id"
+              />
+            </div>
+          </div>
+          <div class="setting-row-time">
+            <div class="time-box">
+              <label for="input-cfg-gh-user">GitHub User / Owner:</label>
+              <input
+                type="text"
+                id="input-cfg-gh-user"
+                placeholder="chuvitvang"
+              />
+            </div>
+            <div class="time-box">
+              <label for="input-cfg-gh-repo">GitHub Repository:</label>
+              <input
+                type="text"
+                id="input-cfg-gh-repo"
+                placeholder="Iot_smart_drying_rack"
+              />
+            </div>
+          </div>
+
+          <div class="save-actions">
+            <button id="btn-save-settings" class="btn btn-primary">
+              Lưu Cài đặt
+            </button>
+            <span id="save-toast" class="toast-msg"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TRANG 4: BẢO TRÌ ==================== -->
+      <section id="tab-maintenance" class="tab-content">
+        <div class="card maint-page-card">
+          <div class="maint-page-header">
+            <h2>🛠️ Cơ chế Bảo trì & Cập nhật Firmware</h2>
+            <p class="section-desc">
+              Quản lý phiên bản vi điều khiển WeMos D1 R2 (ESP8266), cập nhật mã
+              nguồn OTA từ xa qua GitHub và kích hoạt khởi động lại thiết bị an
+              toàn.
+            </p>
+          </div>
+
+          <div class="maint-grid-boxes">
+            <!-- Hộp thông tin phiên bản -->
+            <div class="maint-card-sub">
+              <h3>📦 Thông tin Phiên bản Hệ thống</h3>
+              <div class="status-row">
+                <span>Phiên bản Firmware trên mạch:</span>
+                <strong id="curr-fw-ver" class="badge online">v2.0.0</strong>
+              </div>
+              <div class="status-row">
+                <span>Phiên bản mới nhất trên GitHub:</span>
+                <strong id="git-fw-ver" class="badge">Chưa kiểm tra</strong>
+              </div>
+              <div class="status-row">
+                <span>Trạng thái tiến trình OTA:</span>
+                <strong id="ota-status-text" class="badge">IDLE</strong>
+              </div>
+            </div>
+
+            <!-- Hộp thao tác OTA & Reset -->
+            <div class="maint-card-sub">
+              <h3>⚡ Thao tác Bảo trì từ xa</h3>
+              <div class="maint-actions-vertical">
+                <button
+                  id="btn-check-ota"
+                  class="btn btn-outline"
+                  style="width: 100%"
+                >
+                  🔍 Kiểm tra bản cập nhật GitHub
+                </button>
+                <button
+                  id="btn-update-ota"
+                  class="btn btn-success"
+                  style="width: 100%"
+                  disabled
+                >
+                  🚀 Update Firmware (OTA)
+                </button>
+                <button
+                  id="btn-reset-mcu"
+                  class="btn btn-danger"
+                  style="width: 100%"
+                >
+                  🔄 Reset thiết bị từ xa
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hướng dẫn và quy trình kỹ thuật -->
+          <div class="maint-guide">
+            <h3>📖 Quy trình & Hướng dẫn Kỹ thuật</h3>
+            <ul>
+              <li>
+                <strong>Cổng Cấu hình WiFi Thông minh (Captive Portal):</strong>
+                Khi mạch chưa có WiFi hoặc đổi nhà/đổi mật khẩu, mạch tự phát
+                WiFi <code>SaoPhoi-Setup</code> (IP: <code>192.168.4.1</code>).
+                Kết nối điện thoại vào mạng này, trang cài đặt sẽ tự động bật
+                lên để chọn WiFi và lưu mật khẩu mà không cần cắm máy tính.
+              </li>
+              <li>
+                <strong>Đổi WiFi chủ động:</strong> Nhấn giữ nút nhấn SW1 (GPIO
+                12) trên 3 giây trong khi cắm nguồn để cưỡng bức mở Cổng cấu
+                hình WiFi bất kỳ lúc nào.
+              </li>
+              <li>
+                <strong
+                  >Cập nhật OTA 100% Không dây (Zero Hardware Touch):</strong
+                >
+                Hoàn toàn không cần chạm vào nút bấm phần cứng. Bạn chỉ cần nhấn
+                <em>"Kiểm tra bản cập nhật"</em> rồi bấm
+                <em>"Update Firmware (OTA)"</em> trên Web. Vi điều khiển ESP8266
+                sẽ tự động nhận lệnh qua Firebase, tải mã nguồn mới từ GitHub và
+                tự khởi động lại.
+              </li>
+              <li>
+                <strong>Tự động kiểm tra khi cấp nguồn:</strong> Mỗi lần mạch
+                khởi động lại, hệ thống sẽ tự đối chiếu file
+                <code>version.json</code> trên GitHub để tự động đồng bộ bản mới
+                nhất.
+              </li>
+              <li>
+                <strong>Khởi động lại từ xa (Soft Reset):</strong> Gửi cờ
+                <code>trigger_reset = true</code> qua Firebase để khởi động lại
+                mạch an toàn mà không cần rút nguồn điện vật lý.
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ==================== DEV SIMULATOR BAR ==================== -->
+    <aside id="dev-sim-bar" class="dev-sim-bar collapsed">
+      <!-- Header / Toggle Strip -->
+      <div class="sim-header" id="sim-header-toggle">
+        <div class="sim-title">
+          <span class="sim-icon">🛠️</span>
+          <strong>Dev Simulator Bar</strong>
+          <span class="badge badge-sim" id="sim-mode-badge">LOCAL MOCK</span>
+          <span class="sim-subtext"
+            >Kiểm thử cảm biến & kịch bản thời tiết</span
+          >
+        </div>
+        <div class="sim-header-actions">
+          <button
+            id="btn-toggle-sim-collapse"
+            class="btn btn-sm btn-outline-light"
+          >
+            <span id="sim-collapse-icon">▲</span>
+            <span id="sim-collapse-text">Mở Simulator</span>
+          </button>
         </div>
       </div>
 
-      <!-- Row 2: Sliders & Controls -->
-      <div class="sim-grid-sliders">
-        <!-- Rain Sensor A0 -->
-        <div class="sim-slider-box">
-          <div class="sim-slider-header">
-2            <span>🌧️ Nước A2 (ADS1115):</span>
-            <strong id="sim-val-rain">100</strong>
-            <small id="sim-sub-rain">(Khô ráo)</small>
+      <!-- Simulator Body (Collapsible) -->
+      <div class="sim-body" id="sim-body">
+        <!-- Row 1: Scenarios & Mode -->
+        <div class="sim-row">
+          <div class="sim-col">
+            <label class="sim-label"
+              >🎯 Kịch bản nhanh (Quick Scenarios):</label
+            >
+            <div class="sim-btn-group">
+              <button class="btn btn-sm sim-scenario-btn" data-scenario="sunny">
+                ☀️ Nắng to (Phơi đồ)
+              </button>
+              <button class="btn btn-sm sim-scenario-btn" data-scenario="rainy">
+                🌧️ Đổ mưa (Thu sào)
+              </button>
+              <button
+                class="btn btn-sm sim-scenario-btn"
+                data-scenario="cloudy"
+              >
+                🌥️ Râm mát / Tối
+              </button>
+              <button class="btn btn-sm sim-scenario-btn" data-scenario="night">
+                🌙 Đêm khuya
+              </button>
+            </div>
           </div>
-          <input type="range" id="sim-slider-rain" min="0" max="5000" step="10" value="100">
+
+          <div class="sim-col sim-col-mode">
+            <label class="sim-label">Chế độ kiểm thử:</label>
+            <div class="sim-mode-toggle">
+              <label class="radio-label">
+                <input
+                  type="radio"
+                  name="sim-target"
+                  value="local"
+                  checked
+                  id="sim-mode-local"
+                />
+                <span>Chỉ trên Web (Local)</span>
+              </label>
+              <label class="radio-label">
+                <input
+                  type="radio"
+                  name="sim-target"
+                  value="firebase"
+                  id="sim-mode-firebase"
+                />
+                <span>Ghi vào Firebase (Sync)</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <!-- LDR A1 -->
-        <div class="sim-slider-box">
-          <div class="sim-slider-header">
-            <span>☀️ Quang trở LDR A1:</span>
-            <strong id="sim-val-ldr">22000</strong>
-            <small id="sim-sub-ldr">(Nắng)</small>
+        <!-- Row 2: Sliders & Controls -->
+        <div class="sim-grid-sliders">
+          <!-- Rain Sensor A0 -->
+          <div class="sim-slider-box">
+            <div class="sim-slider-header">
+              2 <span>🌧️ Nước A2 (ADS1115):</span>
+              <strong id="sim-val-rain">100</strong>
+              <small id="sim-sub-rain">(Khô ráo)</small>
+            </div>
+            <input
+              type="range"
+              id="sim-slider-rain"
+              min="0"
+              max="5000"
+              step="10"
+              value="100"
+            />
           </div>
-          <input type="range" id="sim-slider-ldr" min="0" max="10000" step="50" value="3000">
+
+          <!-- LDR A1 -->
+          <div class="sim-slider-box">
+            <div class="sim-slider-header">
+              <span>☀️ Quang trở LDR A1:</span>
+              <strong id="sim-val-ldr">22000</strong>
+              <small id="sim-sub-ldr">(Nắng)</small>
+            </div>
+            <input
+              type="range"
+              id="sim-slider-ldr"
+              min="0"
+              max="10000"
+              step="50"
+              value="3000"
+            />
+          </div>
+
+          <!-- Temperature -->
+          <div class="sim-slider-box">
+            <div class="sim-slider-header">
+              <span>🌡️ Nhiệt độ DHT11:</span>
+              <strong id="sim-val-temp">32.5 °C</strong>
+            </div>
+            <input
+              type="range"
+              id="sim-slider-temp"
+              min="15.0"
+              max="45.0"
+              step="0.5"
+              value="32.5"
+            />
+          </div>
+
+          <!-- Humidity -->
+          <div class="sim-slider-box">
+            <div class="sim-slider-header">
+              <span>💧 Độ ẩm DHT11:</span>
+              <strong id="sim-val-hum">60.0 %</strong>
+              <small id="sim-sub-hum">(Đạt chuẩn)</small>
+            </div>
+            <input
+              type="range"
+              id="sim-slider-hum"
+              min="20.0"
+              max="100.0"
+              step="1.0"
+              value="60.0"
+            />
+          </div>
         </div>
 
-        <!-- Temperature -->
-        <div class="sim-slider-box">
-          <div class="sim-slider-header">
-            <span>🌡️ Nhiệt độ DHT11:</span>
-            <strong id="sim-val-temp">32.5 °C</strong>
+        <!-- Row 3: Action Buttons & Auto Generator -->
+        <div class="sim-row sim-footer-row">
+          <div class="sim-auto-drift">
+            <label class="switch switch-sm">
+              <input type="checkbox" id="sim-toggle-auto" />
+              <span class="slider"></span>
+            </label>
+            <span>Tự động phát sinh dữ liệu (Auto-drift mỗi 3s)</span>
           </div>
-          <input type="range" id="sim-slider-temp" min="15.0" max="45.0" step="0.5" value="32.5">
-        </div>
 
-        <!-- Humidity -->
-        <div class="sim-slider-box">
-          <div class="sim-slider-header">
-            <span>💧 Độ ẩm DHT11:</span>
-            <strong id="sim-val-hum">60.0 %</strong>
-            <small id="sim-sub-hum">(Đạt chuẩn)</small>
+          <div class="sim-actions">
+            <button id="btn-sim-apply" class="btn btn-sm btn-primary">
+              ⚡ Áp dụng dữ liệu
+            </button>
+            <button id="btn-sim-push-hist" class="btn btn-sm btn-outline-light">
+              📈 Ghi 1 mốc Lịch sử (Chart)
+            </button>
+            <button id="btn-sim-reset" class="btn btn-sm btn-secondary">
+              🔄 Mặc định
+            </button>
           </div>
-          <input type="range" id="sim-slider-hum" min="20.0" max="100.0" step="1.0" value="60.0">
         </div>
       </div>
+    </aside>
 
-      <!-- Row 3: Action Buttons & Auto Generator -->
-      <div class="sim-row sim-footer-row">
-        <div class="sim-auto-drift">
-          <label class="switch switch-sm">
-            <input type="checkbox" id="sim-toggle-auto">
-            <span class="slider"></span>
-          </label>
-          <span>Tự động phát sinh dữ liệu (Auto-drift mỗi 3s)</span>
-        </div>
-
-        <div class="sim-actions">
-          <button id="btn-sim-apply" class="btn btn-sm btn-primary">⚡ Áp dụng dữ liệu</button>
-          <button id="btn-sim-push-hist" class="btn btn-sm btn-outline-light">📈 Ghi 1 mốc Lịch sử (Chart)</button>
-          <button id="btn-sim-reset" class="btn btn-sm btn-secondary">🔄 Mặc định</button>
-        </div>
-      </div>
-    </div>
-  </aside>
-
-  <script type="module" src="app.js"></script>
-</body>
-
+    <script type="module" src="app.js"></script>
+  </body>
 </html>

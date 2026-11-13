@@ -125,6 +125,27 @@ def fetch_firebase_section(section):
         gc.collect()
     return data
 
+def reset_control_mode_on_boot():
+    if not firebase_enabled:
+        return
+
+    res = None
+    try:
+        gc.collect()
+        res = urequests.patch(build_fb_url("control"), json={
+            "mode": "AUTO",
+            "manual_command": "NONE"
+        })
+        if res.status_code != 200:
+            print("[!] Firebase trả về HTTP", res.status_code, "khi đặt lại chế độ AUTO")
+    except Exception as e:
+        print("[!] Không thể đặt chế độ AUTO trên Firebase khi khởi động:", e)
+    finally:
+        if res:
+            res.close()
+        res = None
+        gc.collect()
+
 def update_firebase_maintenance_flag(key, val):
     """Cập nhật cờ bảo trì trên Firebase"""
     if not firebase_enabled:

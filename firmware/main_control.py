@@ -3,15 +3,9 @@ def apply_target_state(current_time_str, is_raining, is_humid):
     # Mục tiêu dự kiến cho sào phơi: "OPEN" hoặc "CLOSED"
     target_state = system_state["clothesline_state"]
 
-    # Mức ưu tiên 1: Chế độ ưu tiên chống mưa & chống ẩm ướt (Rain & High Humidity Override)
-    if system_state["rain_priority_override"] and (is_raining or is_humid):
-        target_state = "CLOSED"
-
-    # Mức ưu tiên 2: Điều khiển thủ công (Manual Command)
-    elif system_state["manual_command"] in ("OPEN", "CLOSE"):
-        target_state = system_state["manual_command"]
-
-    # Mức ưu tiên 3: Lịch hẹn giờ tự động (Auto Schedule)
+    if system_state["mode"] == "MANUAL":
+        if system_state["manual_command"] in ("OPEN", "CLOSE"):
+            target_state = "OPEN" if system_state["manual_command"] == "OPEN" else "CLOSED"
     elif system_state["auto_schedule_enabled"]:
         op_time = system_state["open_time"]
         cl_time = system_state["close_time"]
@@ -21,10 +15,14 @@ def apply_target_state(current_time_str, is_raining, is_humid):
             in_schedule = op_time <= current_time_str < cl_time
         else:
             in_schedule = current_time_str >= op_time or current_time_str < cl_time
-        if in_schedule and not is_raining and not is_humid:
-            target_state = "OPEN"
-        else:
+        if not in_schedule or (
+            system_state["rain_priority_override"] and (is_raining or is_humid)
+        ):
             target_state = "CLOSED"
+        else:
+            target_state = "OPEN"
+    elif (system_state["rain_priority_override"] or not system_state["auto_schedule_enabled"]) and (is_raining or is_humid):
+        target_state = "CLOSED"
 
     # Thực thi điều khiển Servo nếu trạng thái thay đổi
     if target_state != system_state["clothesline_state"]:

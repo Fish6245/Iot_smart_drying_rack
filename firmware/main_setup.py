@@ -98,6 +98,7 @@ system_state = {
     "sun_stats_loaded": False,
 
     # Control
+    "mode": "AUTO",                    # "AUTO" hoặc "MANUAL"
     "manual_command": "NONE",           # "OPEN", "CLOSE", "NONE"
     "servo_angle": config.SERVO_ANGLE_IN,
     "rain_threshold": config.DEFAULT_RAIN_THRESHOLD,

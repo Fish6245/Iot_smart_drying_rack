@@ -11,6 +11,10 @@ def sync_firebase_commands():
             if "humidity_threshold" in ctrl and ctrl["humidity_threshold"] is not None:
                 system_state["humidity_threshold"] = float(ctrl["humidity_threshold"])
 
+            mode = ctrl.get("mode")
+            if mode in ("AUTO", "MANUAL"):
+                system_state["mode"] = mode
+
             cmd = ctrl.get("manual_command")
             if cmd in ("OPEN", "CLOSE", "NONE") and cmd != system_state["manual_command"]:
                 if cmd in ("OPEN", "CLOSE"):

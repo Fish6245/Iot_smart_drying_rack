@@ -51,6 +51,7 @@ def handle_button():
     new_state = "CLOSED" if system_state["clothesline_state"] == "OPEN" else "OPEN"
     manual_command = "CLOSE" if new_state == "CLOSED" else "OPEN"
     print(f"[*] Bấm nút SW1: Chuyển sào sang {new_state}")
+    system_state["mode"] = "MANUAL"
     system_state["manual_command"] = manual_command
     system_state["clothesline_state"] = new_state
     system_state["servo_angle"] = config.SERVO_ANGLE_OUT if new_state == "OPEN" else config.SERVO_ANGLE_IN
@@ -60,6 +61,7 @@ def handle_button():
         try:
             gc.collect()
             res_m = urequests.patch(build_fb_url("control"), json={
+                "mode": "MANUAL",
                 "manual_command": manual_command,
                 "servo_angle": system_state["servo_angle"]
             })
