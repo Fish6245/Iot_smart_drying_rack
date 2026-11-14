@@ -145,11 +145,11 @@ Iot_smart_drying_rack/
 ## 📡 6. Cổng Cấu Hình WiFi Thông Minh (WiFi Captive Portal)
 
 Đối với người dùng mới hoặc khi mang thiết bị sang môi trường WiFi khác:
-1. **Tự động kích hoạt:** Nếu mạch không kết nối được WiFi sau 12 giây lúc bật nguồn, mạch tự động phát Access Point:
+1. **Kích hoạt chủ động:** Cấp nguồn hoặc nhấn RST, sau đó nhấn SW1 (D6) trong 3 giây đầu khởi động. Khi nhận nút, Access Point bật trong 3 phút:
    - **Tên WiFi:** `SaoPhoi-Setup` (mở, không cần mật khẩu).
    - **Địa chỉ IP:** `192.168.4.1` (Tích hợp Tiny DNS Server tự động mở trang cấu hình trên điện thoại).
-2. **Kích hoạt chủ động:** Nhấn giữ nút nhấn cơ **SW1 (GPIO 12)** trên 3 giây trong khi cắm nguồn hoặc bấm RST.
+2. **Tự động kích hoạt:** Nếu không yêu cầu cấu hình bằng D6 và mạch không kết nối được WiFi sau 20 giây, AP cấu hình tự bật trong 3 phút. Nếu D6 đã mở AP nhưng hết giờ, board thử kết nối bằng thông tin WiFi đã lưu và không mở AP lần hai trong cùng lần khởi động.
 3. **Thao tác người dùng:**
    - Kết nối điện thoại vào WiFi `SaoPhoi-Setup`.
    - Chọn tên WiFi nhà bạn trong danh sách các mạng được quét sẵn và nhập mật khẩu.
-   - Bấm **"Lưu WiFi & Khởi Động Lại"**. Mạch sẽ tự lưu thông tin vào `.env` và kết nối Internet tự động.
+   - Bấm **"Lưu WiFi & Khởi Động Lại"**. Mạch lưu WiFi vào `config.ini` để dễ xem/chỉnh sửa trong uPyCraft. Các thiết lập khác trong file được giữ nguyên và cấu hình đã lưu được dùng sau mỗi lần reset.

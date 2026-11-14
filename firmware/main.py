@@ -11,8 +11,8 @@ for _part in (
     "main_sync.py",
     "main_control.py",
     "main_periodic.py",
-    "main_setup.py",
     "main_firebase.py",
+    "main_setup.py",
 ):
     gc.collect()
     with open(_part, "r") as _source:

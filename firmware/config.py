@@ -7,18 +7,20 @@
 def _load_env():
     """Đọc file cấu hình config.ini hoặc .env từ bộ nhớ Flash ESP8266."""
     paths = (
+        "/.env",
+        ".env",
+        "/firmware/.env",
+        "firmware/.env",
+        "../.env",
         "/config.ini",
         "config.ini",
         "/firmware/config.ini",
         "firmware/config.ini",
         "../config.ini",
         "../firmware/config.ini",
-        "/.env",
-        ".env",
-        "/firmware/.env",
-        "firmware/.env",
-        "../.env",
     )
+    merged_env = {}
+    loaded_paths = []
 
     for path in paths:
         try:
@@ -44,21 +46,23 @@ def _load_env():
                 env[key] = value
 
             if env:
-                ssid = env.get("WIFI_SSID", "")
-                password = env.get("WIFI_PASSWORD", "")
-
-                if ssid and password:
-                    print("[+] Da doc config:", path)
-                    print("SSID:", ssid)
-                    print("Password:", 'Da doc' if password != "YOUR_WIFI_PASSWORD" else "Chua doc")
-                    return env
-
-                print("[!] File co cau hinh nhung thieu WiFi:", path)
+                merged_env.update(env)
+                loaded_paths.append(path)
 
         except OSError:
             continue
         except Exception as e:
             print("[!] Loi doc", path, ":", repr(e))
+
+    ssid = merged_env.get("WIFI_SSID", "")
+    password = merged_env.get("WIFI_PASSWORD", "")
+    if ssid and password:
+        print("[+] Da doc config:", ", ".join(loaded_paths))
+        print("SSID:", ssid)
+        print("Password:", 'Da doc' if password != "YOUR_WIFI_PASSWORD" else "Chua doc")
+        return merged_env
+    if merged_env:
+        print("[!] File co cau hinh nhung thieu WiFi")
 
     print("[!] Khong doc duoc cau hinh WiFi!")
     return {}
