@@ -1,5 +1,5 @@
 {
-  "version": "3.1.0",
+  "version": "3.2.0",
   "files": [
     "main.py",
     "main_setup.py",
@@ -13,5 +13,5 @@
     "wifi_manager.py",
     "ads1x15.py"
   ],
-  "changelog": "Bản cập nhật V3.1: Hợp nhất PR #1 (Modular hóa Firmware chống tràn RAM ESP8266, hỗ trợ config.ini uPyCraft, tối ưu Wi-Fi, map cảm biến nước A2, chuẩn hóa DHT11 và duy trì WiFi Captive Portal)."
+  "changelog": "V3.2.0: Bổ sung chế độ AUTO/MANUAL, cải thiện nút SW1 và độ ổn định WiFi Captive Portal; đồng bộ version OTA."
 }

@@ -3,6 +3,10 @@
 # WeMos D1 R2 | ADS1115 (A1/A2), DHT11 (D4) | Servo SG90 (D7) | Firebase | GitHub OTA
 # ==============================================================================
 import gc
+import config
+
+FIRMWARE_VERSION = "3.2.0"
+config.CURRENT_VERSION = FIRMWARE_VERSION
 
 gc.collect()
 for _part in (

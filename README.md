@@ -27,6 +27,8 @@ Iot_smart_drying_rack/
 └── README.md                # Tài liệu kỹ thuật & hướng dẫn triển khai V2.0
 ```
 
+WebApp đọc cấu hình Firebase local từ `webapp/.env`; file này được Git bỏ qua nhưng giá trị vẫn hiển thị trong trình duyệt, nên không đặt secret quản trị vào đó.
+
 ---
 
 ## 🔌 2. Ánh Xạ Phần Cứng & Sơ Đồ Chân (Pinout Mapping)
@@ -72,8 +74,8 @@ Iot_smart_drying_rack/
       "rain_priority_override": true
     },
     "maintenance": {
-      "current_version": "2.0.0",
-      "target_version": "2.0.0",
+      "current_version": "3.2.0",
+      "target_version": "3.2.0",
       "trigger_ota": false,
       "trigger_reset": false,
       "ota_status": "IDLE"

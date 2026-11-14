@@ -90,9 +90,6 @@ LOCAL_OTA_URL = _env.get("LOCAL_OTA_URL", "")
 CHECK_GITHUB_OTA_ON_BOOT = _env.get("CHECK_GITHUB_OTA_ON_BOOT", "0") == "1"
 ENABLE_WEBREPL = _env.get("ENABLE_WEBREPL", "0") == "1"
 
-# Phiên bản hiện hành của Firmware
-CURRENT_VERSION = "3.1.0"
-
 # 4. Sơ đồ chân GPIO (WeMos D1 R2)
 PIN_I2C_SCL = 5   # D1 (GPIO 5) -> SCL ADS1115
 PIN_I2C_SDA = 4   # D2 (GPIO 4) -> SDA ADS1115

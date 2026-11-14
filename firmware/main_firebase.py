@@ -58,6 +58,7 @@ def push_telemetry(temp, hum, water_a2, is_raining, ldr_a1, is_sunny, is_humid):
         "is_sunny": is_sunny,
         "is_humid": is_humid,
         "clothesline_state": system_state["clothesline_state"],
+        "firmware_version": config.CURRENT_VERSION,
         "last_updated": time.time()
     }
     if system_state["sun_stats_loaded"]:

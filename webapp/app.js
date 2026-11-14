@@ -302,6 +302,8 @@ function setupFirebaseListeners() {
     const data = snapshot.val();
     if (!data) return;
     updateUIWithTelemetry(data, false);
+    const curVer = document.getElementById('curr-fw-ver');
+    if (curVer && data.firmware_version) curVer.innerText = `v${data.firmware_version}`;
   });
 
   // 2. Giám sát Cơ chế Bảo trì (Maintenance)
@@ -438,7 +440,7 @@ document.getElementById('btn-check-ota')?.addEventListener('click', async () => 
     const remoteGitData = await res.json();
 
     if (gitVerEl) gitVerEl.innerText = `v${remoteGitData.version}`;
-    const curr = document.getElementById('curr-fw-ver')?.innerText.replace('v', '') || "2.0.0";
+    const curr = document.getElementById('curr-fw-ver')?.innerText.replace('v', '') || "";
 
     if (btnOta) {
       btnOta.disabled = (remoteGitData.version === curr);

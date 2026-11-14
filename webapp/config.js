@@ -3,13 +3,46 @@
 // Người dùng có thể chỉnh sửa trực tiếp hoặc thông qua tab Cài đặt trên WebApp
 // ==============================================================================
 
+async function loadLocalEnv() {
+  try {
+    const response = await fetch(new URL("./.env", import.meta.url), {
+      cache: "no-store",
+    });
+    if (response.status === 404) return {};
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const values = {};
+    for (const line of (await response.text()).split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const separator = trimmed.indexOf("=");
+      if (separator < 0) continue;
+
+      const key = trimmed.slice(0, separator).trim();
+      let value = trimmed.slice(separator + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      values[key] = value;
+    }
+    return values;
+  } catch (error) {
+    console.warn("Không thể đọc webapp/.env; dùng cấu hình đã lưu trong trình duyệt.", error);
+    return {};
+  }
+}
+
+const localEnv = await loadLocalEnv();
+
 export const DEFAULT_CONFIG = {
   // 1. Cấu hình Firebase Realtime Database
   firebase: {
-    apiKey: "AIzaSyD1OZ_WDrUGrKLDoOy6AhYncnVXaIWyN8c",
-    databaseURL:
-      "https://iot-group5-nlu-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "iotsmartdryingrack-default-rtdb",
+    apiKey: localEnv.FIREBASE_API_KEY || "",
+    databaseURL: localEnv.FIREBASE_DATABASE_URL || "",
+    projectId: localEnv.FIREBASE_PROJECT_ID || "",
   },
 
   // 2. Cấu hình GitHub Repository phục vụ OTA
