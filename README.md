@@ -132,7 +132,7 @@ WebApp đọc cấu hình Firebase local từ `webapp/.env`; file này được 
 1. **Đồng bộ thời gian thực qua NTP (`ntptime`):**
    - Tự động đồng bộ thời gian từ máy chủ NTP sau khi kết nối Wi-Fi, cộng độ lệch múi giờ Việt Nam ($\text{UTC}+7 = +25200\text{s}$) để so khớp giờ mở/thu sào và tự động đặt lại `sun_minutes_today` về 0 lúc `00:00`.
 2. **Hai mode điều khiển Servo SG90:**
-   - Mặc định sau khi khởi động/reset board là `AUTO`; mode AUTO theo lịch. Khi bật `rain_priority_override`, mưa hoặc độ ẩm cao thu sào bất kể lịch. Khi tắt, sào vẫn mở trong lịch và thu khi hết giờ.
+   - Mặc định sau khi khởi động/reset board là `AUTO`; khi bật lịch, sào theo giờ mở/thu và `rain_priority_override` quyết định có thu vì mưa/ẩm trong giờ phơi hay không. Khi tắt lịch, AUTO bỏ qua giờ và chỉ dựa vào thời tiết: khô ráo thì mở, mưa hoặc ẩm cao thì thu.
    - Chọn `MANUAL` trên Web hoặc nhấn SW1 (D6) để chuyển sang thủ công. Nút **Mở sào** / **Thu sào** chuyển sang thủ công và áp dụng đúng trạng thái đã chọn; mode thủ công không bị lịch hay thời tiết ghi đè.
    - Reset board đặt `mode = "AUTO"` và `manual_command = "NONE"` trên Firebase để không khôi phục lệnh thủ công cũ.
 3. **Thống kê & Ghi nhận lịch sử:**

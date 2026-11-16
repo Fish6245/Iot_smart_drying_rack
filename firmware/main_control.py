@@ -21,8 +21,8 @@ def apply_target_state(current_time_str, is_raining, is_humid):
             target_state = "CLOSED"
         else:
             target_state = "OPEN"
-    elif (system_state["rain_priority_override"] or not system_state["auto_schedule_enabled"]) and (is_raining or is_humid):
-        target_state = "CLOSED"
+    else:
+        target_state = "CLOSED" if is_raining or is_humid else "OPEN"
 
     # Thực thi điều khiển Servo nếu trạng thái thay đổi
     if target_state != system_state["clothesline_state"]:

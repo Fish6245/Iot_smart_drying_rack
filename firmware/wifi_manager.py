@@ -188,7 +188,7 @@ def start_portal(timeout_sec=180):
     ap_if = network.WLAN(network.AP_IF)
 
     ap_if.active(True)
-    ap_if.config(essid=AP_SSID)
+    ap_if.config(essid=AP_SSID, authmode=network.AUTH_OPEN)
     ap_if.ifconfig((AP_IP, AP_SUBNET, AP_IP, AP_IP))
 
     # 1. Kh&#7903;i t&#7841;o DNS Server (Port 53 UDP)

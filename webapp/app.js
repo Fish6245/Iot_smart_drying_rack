@@ -695,10 +695,8 @@ function applySimulatedData() {
     clotheslineState = !inSchedule || (rainPriority && (isRaining || isHumid))
       ? "CLOSED"
       : "OPEN";
-  } else if ((rainPriority || !autoScheduleEnabled) && (isRaining || isHumid)) {
-    clotheslineState = "CLOSED";
   } else {
-    clotheslineState = isSunny && !isRaining && !isHumid ? "OPEN" : "CLOSED";
+    clotheslineState = isRaining || isHumid ? "CLOSED" : "OPEN";
   }
 
   const simulatedPayload = {
